@@ -6,6 +6,9 @@ import (
 	"os"
 )
 
+// Version information will be set at build time
+var Version = "dev"
+
 var (
 	// Exported flag variables
 	WithHeader       bool
@@ -21,6 +24,7 @@ var (
 	IgnoreExpiration bool
 	ConfigFile       string
 	SaveConfig       bool
+	ShowVersion      bool
 
 	// Track if flags were explicitly set by user
 	HeaderExplicit         bool
@@ -111,6 +115,9 @@ func InitFlags() {
 	
 	// Config file flag
 	flag.StringVar(&ConfigFile, "config", "", "path to config file")
+	
+	// Version flag
+	flag.BoolVar(&ShowVersion, "version", false, "show version information")
 	
 	flag.Usage = PrintUsage
 }
