@@ -40,6 +40,16 @@ brews:
     test: |
       system "#{bin}/jwtdebug -version"
 
+nfpms:
+  - vendor: Roberto Selbach
+    homepage:  https://github.com/rselbach/jwtdebug
+    maintainer: Roberto Selbach <rselbach@rselbach.com>
+    license: MIT
+    formats:
+    - deb
+    - rpm
+    - archlinux
+
 archives:
   - formats: [tar.gz]
     # this name template makes the OS and Arch compatible with the results of `uname`.
