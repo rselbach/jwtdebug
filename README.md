@@ -33,6 +33,20 @@ jwtdebug/
 
 ## Installation
 
+### Using Homebrew
+
+The recommended way to install jwtdebug is through Homebrew:
+
+```bash
+# Install from our tap
+brew tap rselbach/tap
+brew install jwtdebug
+```
+
+This will download and install the latest version of jwtdebug automatically.
+
+### Building from Source
+
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/jwtdebug.git
@@ -40,9 +54,20 @@ cd jwtdebug
 
 # Build the binary
 ./build.sh
+# or use make
+make
 
 # (Optional) Move to your PATH
 mv jwtdebug /usr/local/bin/
+```
+
+### Upgrading
+
+To upgrade to the latest version when installed via Homebrew:
+
+```bash
+brew update
+brew upgrade jwtdebug
 ```
 
 ## Usage
