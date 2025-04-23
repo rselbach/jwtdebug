@@ -1,0 +1,20 @@
+project_name: jwtdebug
+
+builds:
+  - main: ./cmd/jwtdebug
+    binary: jwtdebug
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+brews:
+  - name: jwtdebug
+    homepage: "https://github.com/rselbach/jwtdebug"
+    description: "A tool for debugging and inspecting JWT tokens"
+    tap:
+      owner: rselbach
+      name: homebrew-tap
+    license: "MIT"
