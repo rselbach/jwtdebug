@@ -7,6 +7,7 @@ BINARY_NAME=jwtdebug
 GOBASE=$(shell pwd)
 GOBIN=$(GOBASE)/bin
 GOFILES=$(wildcard ./cmd/jwtdebug/*.go) $(wildcard ./internal/*/*.go)
+BUILD_DIR=build
 
 # Version from git: if a tag exists, use the tag, otherwise use the commit hash
 # GoReleaser sets GORELEASER_CURRENT_TAG if building through GoReleaser
@@ -17,21 +18,22 @@ LDFLAGS=-ldflags "-s -w -X github.com/rselbach/jwtdebug/internal/cli.Version=$(V
 
 all: build
 
-build:
+build: 
 	@echo "Building $(BINARY_NAME)..."
-	@go build -o $(BINARY_NAME) $(LDFLAGS) ./cmd/jwtdebug
-	@echo "Build successful! The binary '$(BINARY_NAME)' is now available."
+	@mkdir -p $(BUILD_DIR)
+	@go build -o $(BUILD_DIR)/$(BINARY_NAME) $(LDFLAGS) ./cmd/jwtdebug
+	@echo "Build successful! The binary '$(BUILD_DIR)/$(BINARY_NAME)' is now available."
 
 clean:
 	@echo "Cleaning..."
-	@rm -f $(BINARY_NAME)
+	@rm -rf $(BUILD_DIR)
 	@echo "Done!"
 
 test:
 	@echo "Running tests..."
 	@go test -v ./...
 
-install:
+install: build
 	@echo "Installing $(BINARY_NAME) version $(VERSION)..."
-	@go install $(LDFLAGS) ./cmd/jwtdebug
+	@cp $(BUILD_DIR)/$(BINARY_NAME) $(GOBIN)/
 	@echo "Installation successful!"
