@@ -39,8 +39,6 @@ brews:
     download_strategy: CurlDownloadStrategy
     test: |
       system "#{bin}/jwtdebug -version"
-    dependencies:
-      - name: git
 
 archives:
   - formats: [tar.gz]
