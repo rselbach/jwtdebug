@@ -9,7 +9,7 @@ import (
 	"github.com/fatih/color"
 	"gopkg.in/yaml.v3"
 
-	"jwtdebug/internal/cli"
+	"github.com/rselbach/jwtdebug/internal/cli"
 )
 
 // FormatMap maps the output format to the corresponding formatter function

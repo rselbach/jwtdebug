@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"jwtdebug/internal/cli"
+	"github.com/rselbach/jwtdebug/internal/cli"
 )
 
 // Config represents the application configuration

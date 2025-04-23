@@ -6,9 +6,9 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	
-	"jwtdebug/internal/cli"
-	"jwtdebug/internal/printer"
-	"jwtdebug/internal/verification"
+	"github.com/rselbach/jwtdebug/internal/cli"
+	"github.com/rselbach/jwtdebug/internal/printer"
+	"github.com/rselbach/jwtdebug/internal/verification"
 )
 
 // ProcessToken parses and displays information about a JWT token

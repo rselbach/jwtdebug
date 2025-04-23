@@ -7,7 +7,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	
-	"jwtdebug/internal/cli"
+	"github.com/rselbach/jwtdebug/internal/cli"
 )
 
 // VerifyTokenSignature verifies the token signature using the provided key file

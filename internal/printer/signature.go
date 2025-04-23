@@ -7,7 +7,7 @@ import (
 
 	"github.com/fatih/color"
 	
-	"jwtdebug/internal/cli"
+	"github.com/rselbach/jwtdebug/internal/cli"
 )
 
 // PrintSignature prints information about the token signature

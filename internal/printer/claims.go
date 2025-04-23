@@ -8,7 +8,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/golang-jwt/jwt/v5"
 	
-	"jwtdebug/internal/cli"
+	"github.com/rselbach/jwtdebug/internal/cli"
 )
 
 // PrintClaims prints the token claims in the requested format

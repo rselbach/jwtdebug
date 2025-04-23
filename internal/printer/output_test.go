@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"jwtdebug/internal/cli"
+	"github.com/rselbach/jwtdebug/internal/cli"
 )
 
 func TestFormatJSON(t *testing.T) {
