@@ -107,7 +107,7 @@ func InitFlags() {
 	
 	// These flags need tracking for config file integration
 	flag.Var(stringFlag{&KeyFileExplicit, &KeyFile, ""}, "key", "key file for signature verification")
-	flag.Var(stringFlag{&FormatExplicit, &OutputFormat, "pretty"}, "format", "output format: pretty, json, yaml, or raw")
+	flag.Var(stringFlag{&FormatExplicit, &OutputFormat, "pretty"}, "format", "output format: pretty, json, or raw")
 	flag.Var(boolFlag{&ColorExplicit, &OutputColor, true}, "color", "colorize output")
 	flag.Var(boolFlag{&ExpirationExplicit, &ShowExpiration, false}, "expiry", "check token expiration status")
 	flag.Var(boolFlag{&DecodeBase64Explicit, &DecodeBase64, false}, "decode-sig", "decode signature from base64")
@@ -133,7 +133,7 @@ func PrintUsage() {
 	fmt.Fprintf(os.Stderr, "  jwtdebug eyJhbGci...rest_of_token\n")
 	fmt.Fprintf(os.Stderr, "  echo \"Bearer eyJhbGci...\" | jwtdebug\n")
 	fmt.Fprintf(os.Stderr, "  jwtdebug -all -key pubkey.pem eyJhbGci...rest_of_token\n")
-	fmt.Fprintf(os.Stderr, "  jwtdebug -format yaml -save-config  # Save settings to config file\n")
+	fmt.Fprintf(os.Stderr, "  jwtdebug -format json -save-config  # Save settings to config file\n")
 }
 
 // EnableAllOutputs enables all output options if the -all flag is set

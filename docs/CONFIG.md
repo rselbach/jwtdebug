@@ -38,7 +38,7 @@ You can create a configuration file in two ways:
 Run the tool with your preferred options and add the `-save-config` flag:
 
 ```bash
-jwtdebug -format yaml -color=false -header -save-config
+jwtdebug -format json -color=false -header -save-config
 ```
 
 This will save your current settings to a configuration file in your home directory.
@@ -61,7 +61,7 @@ This means that command-line flags will always override settings from the config
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `defaultFormat` | Default output format (pretty, json, yaml, raw) | pretty |
+| `defaultFormat` | Default output format (pretty, json, or raw) | pretty |
 | `colorEnabled` | Enable colored output | true |
 | `defaultKeyFile` | Default key file for signature verification | "" |
 | `showHeader` | Show token header by default | false |

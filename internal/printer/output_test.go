@@ -34,21 +34,6 @@ func TestFormatJSON(t *testing.T) {
 	}
 }
 
-func TestFormatYAML(t *testing.T) {
-	// test data
-	testData := map[string]interface{}{
-		"key1": "value1",
-		"key2": 42,
-	}
-
-	// format as YAML
-	result := formatYAML(testData)
-
-	// simple validation for YAML format
-	if !strings.Contains(result, "key1: value1") || !strings.Contains(result, "key2: 42") {
-		t.Errorf("YAML output doesn't contain expected values. Got: %s", result)
-	}
-}
 
 func TestFormatRaw(t *testing.T) {
 	// test data
@@ -87,12 +72,6 @@ func TestFormatData(t *testing.T) {
 		t.Errorf("JSON formatter not used correctly")
 	}
 
-	// test with YAML format
-	cli.OutputFormat = "yaml"
-	yamlResult := FormatData(testData)
-	if !strings.Contains(yamlResult, "key1: value1") {
-		t.Errorf("YAML formatter not used correctly")
-	}
 
 	// test with unsupported format (should default to JSON)
 	cli.OutputFormat = "unsupported"

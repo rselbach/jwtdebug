@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"gopkg.in/yaml.v3"
 
 	"github.com/rselbach/jwtdebug/internal/cli"
 )
@@ -16,7 +15,6 @@ import (
 var FormatMap = map[string]func(interface{}) string{
 	"pretty": formatJSON, // "pretty" uses JSON for non-claims data
 	"json":   formatJSON,
-	"yaml":   formatYAML,
 	"raw":    formatRaw,
 }
 
@@ -29,14 +27,6 @@ func formatJSON(v interface{}) string {
 	return string(data)
 }
 
-// formatYAML formats the data as YAML
-func formatYAML(v interface{}) string {
-	data, err := yaml.Marshal(v)
-	if err != nil {
-		return fmt.Sprintf("Error formatting YAML: %v", err)
-	}
-	return string(data)
-}
 
 // formatRaw formats the data as a simple key-value listing
 func formatRaw(v interface{}) string {

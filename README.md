@@ -10,7 +10,7 @@ A modern command-line utility for debugging and analyzing JSON Web Tokens (JWTs)
 - Verify token signatures with various algorithms (HMAC, RSA, ECDSA)
 - Check expiration status and validity periods
 - Colorized output for better readability
-- Support for multiple output formats (JSON, YAML, raw)
+- Support for multiple output formats (JSON, raw)
 - Decode base64-encoded signatures
 - Multiple input methods (command-line arguments, piped input)
 - Persistent configuration via config files
@@ -95,7 +95,7 @@ jwtdebug -verify -key public.pem eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOi
 -config         Path to config file
 -decode-sig     Decode signature from base64
 -expiry         Check token expiration status
--format         Output format: pretty, json, yaml, or raw (default: pretty)
+-format         Output format: pretty, json, or raw (default: pretty)
 -header         Show token header
 -ignore-exp     Ignore token expiration when verifying
 -key string     Key file for signature verification
