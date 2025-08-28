@@ -1,7 +1,6 @@
 package printer
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -24,30 +23,16 @@ func CheckExpiration(token *jwt.Token) {
 
 	// check for "exp" claim
 	if exp, ok := claims["exp"]; ok {
-		var expTime int64
-		
-		switch v := exp.(type) {
-		case float64:
-			expTime = int64(v)
-		case json.Number:
-			expTime, _ = v.Int64()
-		case int64:
-			expTime = v
-		case int:
-			expTime = int64(v)
-		default:
-			fmt.Printf("Unknown expiration type: %T\n", exp)
-			return
-		}
-		
-		expTimeFormatted := time.Unix(expTime, 0).Format(time.RFC3339)
-		
-		if now > expTime {
-			color.Red("✗ Token expired at %s (%.0f seconds ago)", 
-				expTimeFormatted, float64(now-expTime))
+		if t, ok := tryParseTimestamp(exp); ok {
+			expUnix := t.Unix()
+			expTimeFormatted := t.Format(time.RFC3339)
+			if now > expUnix {
+				color.Red("✗ Token expired at %s (%.0f seconds ago)", expTimeFormatted, float64(now-expUnix))
+			} else {
+				color.Green("✓ Token expires at %s (%.0f seconds from now)", expTimeFormatted, float64(expUnix-now))
+			}
 		} else {
-			color.Green("✓ Token expires at %s (%.0f seconds from now)", 
-				expTimeFormatted, float64(expTime-now))
+			fmt.Printf("Unrecognized expiration value: %v\n", exp)
 		}
 	} else {
 		fmt.Println("No expiration claim found")
@@ -55,54 +40,26 @@ func CheckExpiration(token *jwt.Token) {
 
 	// check for "nbf" (not before) claim
 	if nbf, ok := claims["nbf"]; ok {
-		var nbfTime int64
-		
-		switch v := nbf.(type) {
-		case float64:
-			nbfTime = int64(v)
-		case json.Number:
-			nbfTime, _ = v.Int64()
-		case int64:
-			nbfTime = v
-		case int:
-			nbfTime = int64(v)
-		default:
-			fmt.Println("Unknown notBefore type")
-			return
-		}
-		
-		nbfTimeFormatted := time.Unix(nbfTime, 0).Format(time.RFC3339)
-		
-		if now < nbfTime {
-			color.Yellow("⚠ Token not valid yet. Valid from %s (in %.0f seconds)", 
-				nbfTimeFormatted, float64(nbfTime-now))
+		if t, ok := tryParseTimestamp(nbf); ok {
+			nbfUnix := t.Unix()
+			nbfTimeFormatted := t.Format(time.RFC3339)
+			if now < nbfUnix {
+				color.Yellow("⚠ Token not valid yet. Valid from %s (in %.0f seconds)", nbfTimeFormatted, float64(nbfUnix-now))
+			} else {
+				color.Green("✓ Token valid since %s (%.0f seconds ago)", nbfTimeFormatted, float64(now-nbfUnix))
+			}
 		} else {
-			color.Green("✓ Token valid since %s (%.0f seconds ago)", 
-				nbfTimeFormatted, float64(now-nbfTime))
+			fmt.Println("Unrecognized notBefore value")
 		}
 	}
 
 	// check for "iat" (issued at) claim
 	if iat, ok := claims["iat"]; ok {
-		var iatTime int64
-		
-		switch v := iat.(type) {
-		case float64:
-			iatTime = int64(v)
-		case json.Number:
-			iatTime, _ = v.Int64()
-		case int64:
-			iatTime = v
-		case int:
-			iatTime = int64(v)
-		default:
-			fmt.Println("Unknown issuedAt type")
-			return
+		if t, ok := tryParseTimestamp(iat); ok {
+			fmt.Printf("Issued at: %s (%.0f seconds ago)\n", t.Format(time.RFC3339), float64(now-t.Unix()))
+		} else {
+			fmt.Println("Unrecognized issuedAt value")
 		}
-		
-		iatTimeFormatted := time.Unix(iatTime, 0).Format(time.RFC3339)
-		fmt.Printf("Issued at: %s (%.0f seconds ago)\n", 
-			iatTimeFormatted, float64(now-iatTime))
 	}
 
 	fmt.Println()

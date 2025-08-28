@@ -25,7 +25,7 @@ func TestVerifyTokenSignature(t *testing.T) {
 
 	// Valid token signed with the test key
 	validToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
-	
+
 	// Invalid token (payload modified)
 	invalidToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkphbmUgRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
 
@@ -70,16 +70,16 @@ func TestVerifyTokenSignature(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up the test
 			cli.KeyFile = tt.keyFile
-			
+
 			// Call the function
 			err := VerifyTokenSignature(tt.token)
-			
+
 			// Check the result
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
 				} else if tt.errorMessage != "" && !strings.Contains(err.Error(), tt.errorMessage) {
-					t.Errorf("Error message doesn't contain expected text.\nExpected: %s\nGot: %s", 
+					t.Errorf("Error message doesn't contain expected text.\nExpected: %s\nGot: %s",
 						tt.errorMessage, err.Error())
 				}
 			} else {

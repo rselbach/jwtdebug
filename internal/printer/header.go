@@ -7,7 +7,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/golang-jwt/jwt/v5"
-	
+
 	"github.com/rselbach/jwtdebug/internal/cli"
 )
 
@@ -15,14 +15,14 @@ import (
 func PrintHeader(token *jwt.Token) {
 	headerTitle := color.New(color.FgBlue, color.Bold).SprintFunc()
 	fmt.Println(headerTitle("HEADER:"))
-	
+
 	if cli.OutputFormat == "pretty" || cli.OutputFormat == "" {
 		// For pretty format, print in aligned key-value format
 		printPrettyHeader(token.Header)
 	} else {
 		fmt.Println(FormatData(token.Header))
 	}
-	
+
 	fmt.Println()
 }
 
@@ -32,7 +32,7 @@ func printPrettyHeader(header map[string]interface{}) {
 		fmt.Println("  No header information available")
 		return
 	}
-	
+
 	// Get the keys and find the longest key for alignment
 	var keys []string
 	maxKeyLen := 0
@@ -43,12 +43,16 @@ func printPrettyHeader(header map[string]interface{}) {
 		}
 	}
 	sort.Strings(keys)
-	
+
 	// Print each key-value pair with proper alignment
 	keyColor := color.New(color.FgCyan).SprintFunc()
 	for _, k := range keys {
 		// Pad the key name for alignment
 		paddedKey := fmt.Sprintf("  %s:%s", keyColor(k), strings.Repeat(" ", maxKeyLen-len(k)+1))
-		fmt.Printf("%s%v\n", paddedKey, header[k])
+		if s, ok := header[k].(string); ok {
+			fmt.Printf("%s%s\n", paddedKey, sanitizeString(s))
+		} else {
+			fmt.Printf("%s%v\n", paddedKey, header[k])
+		}
 	}
 }

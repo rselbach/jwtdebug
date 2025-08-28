@@ -31,6 +31,9 @@ func formatValue(v interface{}) string {
 		}
 		return fmt.Sprintf("{object with %d keys}", len(val))
 	default:
+		if s, ok := v.(string); ok {
+			return sanitizeString(s)
+		}
 		return fmt.Sprintf("%v", v)
 	}
 }
@@ -39,7 +42,7 @@ func formatValue(v interface{}) string {
 // the time and whether parsing was successful
 func tryParseTimestamp(v interface{}) (time.Time, bool) {
 	var timestamp int64
-	
+
 	// Try to convert to int64 from different numeric types
 	switch val := v.(type) {
 	case float64:
@@ -61,7 +64,7 @@ func tryParseTimestamp(v interface{}) (time.Time, bool) {
 		if err == nil {
 			return t, true
 		}
-		
+
 		// Try common variations
 		formats := []string{
 			"2006-01-02T15:04:05Z07:00", // ISO8601 with timezone
@@ -74,14 +77,14 @@ func tryParseTimestamp(v interface{}) (time.Time, bool) {
 			time.RFC822Z,
 			time.RFC850,
 		}
-		
+
 		for _, format := range formats {
 			t, err := time.Parse(format, val)
 			if err == nil {
 				return t, true
 			}
 		}
-		
+
 		// If all string parsing failed, try to convert to a number
 		// as it might be a numeric timestamp in string form
 		if numVal, err := strconv.ParseInt(val, 10, 64); err == nil {
@@ -92,16 +95,16 @@ func tryParseTimestamp(v interface{}) (time.Time, bool) {
 	default:
 		return time.Time{}, false
 	}
-	
+
 	// Check if the timestamp is in a reasonable range
 	// (between 2000-01-01 and 2100-01-01)
 	minTime := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC).Unix()
 	maxTime := time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC).Unix()
-	
+
 	if timestamp < minTime || timestamp > maxTime {
 		return time.Time{}, false
 	}
-	
+
 	return time.Unix(timestamp, 0), true
 }
 
@@ -109,12 +112,12 @@ func tryParseTimestamp(v interface{}) (time.Time, bool) {
 // Returns the formatted string and whether it was detected as a timestamp
 func formatTimestamp(v interface{}) (string, bool) {
 	timeColor := color.New(color.FgYellow).SprintFunc()
-	
+
 	t, ok := tryParseTimestamp(v)
 	if !ok {
 		return "", false
 	}
-	
+
 	// Format as both the original value and the time string
 	return fmt.Sprintf("%v %s", v, timeColor(t.Format(time.RFC3339))), true
 }
@@ -127,4 +130,11 @@ func PrintVerificationSuccess() {
 // PrintVerificationFailure prints a failure message for signature verification
 func PrintVerificationFailure(err error) {
 	color.Red("✗ Signature verification failed: %v", err)
+}
+
+// PrintUnverifiedNotice prints a single-line warning that claims are unverified.
+// Printed to stderr to avoid breaking machine-readable stdout formats.
+func PrintUnverifiedNotice() {
+	notice := color.New(color.FgYellow).Sprintf("Note: claims are unverified. Use -verify -key to validate.")
+	fmt.Fprintln(color.Error, notice)
 }

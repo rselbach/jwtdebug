@@ -27,7 +27,6 @@ func formatJSON(v interface{}) string {
 	return string(data)
 }
 
-
 // formatRaw formats the data as a simple key-value listing
 func formatRaw(v interface{}) string {
 	switch val := v.(type) {
@@ -45,6 +44,9 @@ func formatRaw(v interface{}) string {
 		}
 		return strings.Join(lines, "\n")
 	default:
+		if s, ok := v.(string); ok {
+			return sanitizeString(s)
+		}
 		return fmt.Sprintf("%v", v)
 	}
 }
@@ -64,6 +66,9 @@ func formatRawValue(v interface{}) string {
 		}
 		return "[" + strings.Join(items, ", ") + "]"
 	default:
+		if s, ok := v.(string); ok {
+			return sanitizeString(s)
+		}
 		return fmt.Sprintf("%v", v)
 	}
 }

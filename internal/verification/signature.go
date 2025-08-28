@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/golang-jwt/jwt/v5"
-	
+
 	"github.com/rselbach/jwtdebug/internal/cli"
 )
 
@@ -24,6 +24,14 @@ func VerifyTokenSignature(tokenString string) error {
 
 	// parse the token with verification
 	var parseOpts []jwt.ParserOption
+	// Restrict accepted algorithms to known-safe set
+	parseOpts = append(parseOpts, jwt.WithValidMethods([]string{
+		"HS256", "HS384", "HS512",
+		"RS256", "RS384", "RS512",
+		"PS256", "PS384", "PS512",
+		"ES256", "ES384", "ES512",
+		"EdDSA",
+	}))
 	if cli.IgnoreExpiration {
 		parseOpts = append(parseOpts, jwt.WithoutClaimsValidation())
 	}
@@ -35,9 +43,15 @@ func VerifyTokenSignature(tokenString string) error {
 		case "HS256", "HS384", "HS512":
 			// HMAC algorithms use the key directly
 			return keyData, nil
-		case "RS256", "RS384", "RS512", "ES256", "ES384", "ES512", "PS256", "PS384", "PS512":
-			// RSA and ECDSA algorithms use a public key
+		case "RS256", "RS384", "RS512", "PS256", "PS384", "PS512":
+			// RSA and RSA-PSS algorithms use an RSA public key
 			return jwt.ParseRSAPublicKeyFromPEM(keyData)
+		case "ES256", "ES384", "ES512":
+			// ECDSA algorithms use an EC public key
+			return jwt.ParseECPublicKeyFromPEM(keyData)
+		case "EdDSA":
+			// Ed25519 public key
+			return jwt.ParseEdPublicKeyFromPEM(keyData)
 		default:
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}

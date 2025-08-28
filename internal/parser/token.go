@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
-	
+
 	"github.com/rselbach/jwtdebug/internal/cli"
 	"github.com/rselbach/jwtdebug/internal/printer"
 	"github.com/rselbach/jwtdebug/internal/verification"
@@ -13,24 +13,22 @@ import (
 
 // ProcessToken parses and displays information about a JWT token
 func ProcessToken(tokenString string) error {
+	tokenString = NormalizeTokenString(tokenString)
 	// split the token into parts for analysis
 	parts := strings.Split(tokenString, ".")
 	if len(parts) != 3 {
 		return fmt.Errorf("invalid token format: expected 3 parts, got %d", len(parts))
 	}
 
-	// parse without verification first
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// return a dummy key since we're not verifying yet
-		return []byte("dummy"), nil
-	}, jwt.WithoutClaimsValidation())
+	// parse without verification first using ParseUnverified
+	token, _, err := jwt.NewParser().ParseUnverified(tokenString, jwt.MapClaims{})
+	if err != nil {
+		return fmt.Errorf("error parsing token: %w", err)
+	}
 
-	// we expect this error since we're not verifying
-	if err != nil && !cli.VerifySignature {
-		// for jwt/v5, we need to check the error differently
-		if !strings.Contains(err.Error(), "signature is invalid") {
-			return fmt.Errorf("error parsing token: %w", err)
-		}
+	// show an unverified notice when not verifying (stderr; does not break JSON)
+	if !cli.VerifySignature {
+		printer.PrintUnverifiedNotice()
 	}
 
 	// print token header

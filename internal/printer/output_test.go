@@ -34,7 +34,6 @@ func TestFormatJSON(t *testing.T) {
 	}
 }
 
-
 func TestFormatRaw(t *testing.T) {
 	// test data
 	testData := map[string]interface{}{
@@ -71,7 +70,6 @@ func TestFormatData(t *testing.T) {
 	if !strings.Contains(jsonResult, "\"key1\": \"value1\"") {
 		t.Errorf("JSON formatter not used correctly")
 	}
-
 
 	// test with unsupported format (should default to JSON)
 	cli.OutputFormat = "unsupported"

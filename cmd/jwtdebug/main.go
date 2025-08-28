@@ -28,11 +28,14 @@ func main() {
 	// load configuration from file
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: Failed to load config: %v\n", err)
-		os.Exit(-1)
+		fmt.Fprintf(os.Stderr, "Error: failed to load config: %v\n", err)
+		os.Exit(1)
 	}
 	// apply configuration (only for options not explicitly set via CLI)
 	config.ApplyConfig(cfg)
+
+	// honor color flag globally
+	color.NoColor = !cli.OutputColor
 
 	// enable all output options if -all flag is set
 	cli.EnableAllOutputs()
@@ -74,9 +77,7 @@ func main() {
 
 	// process tokens provided as arguments
 	for _, token := range flag.Args() {
-		// skip Bearer prefix if present
-		token = strings.TrimPrefix(strings.TrimPrefix(token, "Bearer "), "bearer ")
-
+		token = parser.NormalizeTokenString(token)
 		if err := parser.ProcessToken(token); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
@@ -86,16 +87,19 @@ func main() {
 
 func processFromStdin() error {
 	// check if stdin has data
-	stat, _ := os.Stdin.Stat()
-	if (stat.Mode() & os.ModeCharDevice) != 0 {
-		return fmt.Errorf("no token provided and no data on stdin")
+	stat, err := os.Stdin.Stat()
+	if err == nil {
+		if (stat.Mode() & os.ModeCharDevice) != 0 {
+			return fmt.Errorf("no token provided and no data on stdin")
+		}
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
+	// allow larger JWT inputs
+	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
 	for scanner.Scan() {
-		line := scanner.Text()
-		// skip Bearer prefix if present
-		line = strings.TrimPrefix(strings.TrimPrefix(line, "Bearer "), "bearer ")
+		line := strings.TrimSpace(scanner.Text())
+		line = parser.NormalizeTokenString(line)
 		if line == "" {
 			continue
 		}

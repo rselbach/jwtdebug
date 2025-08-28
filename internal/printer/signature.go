@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	
+
 	"github.com/rselbach/jwtdebug/internal/cli"
 )
 
@@ -14,16 +14,16 @@ import (
 func PrintSignature(sigPart string) {
 	sigTitle := color.New(color.FgYellow, color.Bold).SprintFunc()
 	fmt.Println(sigTitle("SIGNATURE:"))
-	
+
 	if cli.OutputFormat == "pretty" || cli.OutputFormat == "" {
 		// print raw signature in pretty format with alignment
 		keyColor := color.New(color.FgCyan).SprintFunc()
-		
+
 		// Calculate padding for alignment
 		labelLength := 12 // "Decoded (hex)" is the longest label
-		
+
 		fmt.Printf("  %s:%s%s\n", keyColor("Raw"), strings.Repeat(" ", labelLength-3), sigPart)
-		
+
 		// decode and print base64 if requested
 		if cli.DecodeBase64 {
 			sigBytes, err := base64.RawURLEncoding.DecodeString(sigPart)
@@ -40,16 +40,16 @@ func PrintSignature(sigPart string) {
 		sigData := map[string]interface{}{
 			"raw": sigPart,
 		}
-		
+
 		if cli.DecodeBase64 {
 			sigBytes, err := base64.RawURLEncoding.DecodeString(sigPart)
 			if err == nil {
 				sigData["decoded"] = fmt.Sprintf("%x", sigBytes)
 			}
 		}
-		
+
 		fmt.Println(FormatData(sigData))
 	}
-	
+
 	fmt.Println()
 }

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 )
 
 // Version information will be set at build time
@@ -27,21 +28,21 @@ var (
 	ShowVersion      bool
 
 	// Track if flags were explicitly set by user
-	HeaderExplicit         bool
-	ClaimsExplicit         bool
-	SignatureExplicit      bool
-	KeyFileExplicit        bool
-	FormatExplicit         bool
-	ColorExplicit          bool
-	ExpirationExplicit     bool
-	DecodeBase64Explicit   bool
+	HeaderExplicit           bool
+	ClaimsExplicit           bool
+	SignatureExplicit        bool
+	KeyFileExplicit          bool
+	FormatExplicit           bool
+	ColorExplicit            bool
+	ExpirationExplicit       bool
+	DecodeBase64Explicit     bool
 	IgnoreExpirationExplicit bool
 )
 
 // Custom flag types to track if flags were set
 type boolFlag struct {
-	set   *bool
-	value *bool
+	set      *bool
+	value    *bool
 	defValue bool
 }
 
@@ -57,11 +58,13 @@ func (f boolFlag) Set(s string) error {
 		*f.set = true
 	}
 	if f.value != nil {
-		if s == "true" {
-			*f.value = true
-		} else {
-			*f.value = false
+		// Accept standard boolean forms (true/false, 1/0, t/f, yes/no)
+		// Return an error on invalid values so flag.Parse can surface it
+		parsed, err := strconv.ParseBool(s)
+		if err != nil {
+			return err
 		}
+		*f.value = parsed
 	}
 	return nil
 }
@@ -94,17 +97,17 @@ func InitFlags() {
 	WithClaims = true
 	OutputFormat = "pretty"
 	OutputColor = true
-	
+
 	// Define custom flags that track if they were set (with default values)
 	flag.Var(boolFlag{&HeaderExplicit, &WithHeader, false}, "header", "show token header")
 	flag.Var(boolFlag{&ClaimsExplicit, &WithClaims, true}, "claims", "show token claims (payload)")
 	flag.Var(boolFlag{&SignatureExplicit, &WithSignature, false}, "sig", "show token signature")
-	
+
 	// These flags don't need tracking but are included for completeness
 	flag.BoolVar(&VerifySignature, "verify", false, "verify token signature (requires -key)")
 	flag.BoolVar(&ShowAll, "all", false, "show all token parts and info")
 	flag.BoolVar(&SaveConfig, "save-config", false, "save current settings to config file")
-	
+
 	// These flags need tracking for config file integration
 	flag.Var(stringFlag{&KeyFileExplicit, &KeyFile, ""}, "key", "key file for signature verification")
 	flag.Var(stringFlag{&FormatExplicit, &OutputFormat, "pretty"}, "format", "output format: pretty, json, or raw")
@@ -112,13 +115,13 @@ func InitFlags() {
 	flag.Var(boolFlag{&ExpirationExplicit, &ShowExpiration, false}, "expiry", "check token expiration status")
 	flag.Var(boolFlag{&DecodeBase64Explicit, &DecodeBase64, false}, "decode-sig", "decode signature from base64")
 	flag.Var(boolFlag{&IgnoreExpirationExplicit, &IgnoreExpiration, false}, "ignore-exp", "ignore token expiration when verifying")
-	
+
 	// Config file flag
 	flag.StringVar(&ConfigFile, "config", "", "path to config file")
-	
+
 	// Version flag
 	flag.BoolVar(&ShowVersion, "version", false, "show version information")
-	
+
 	flag.Usage = PrintUsage
 }
 
@@ -140,7 +143,7 @@ func PrintUsage() {
 func EnableAllOutputs() {
 	if ShowAll {
 		WithHeader = true
-		WithClaims = true 
+		WithClaims = true
 		WithSignature = true
 		ShowExpiration = true
 	}

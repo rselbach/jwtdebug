@@ -22,6 +22,20 @@ type Config struct {
 	IgnoreExpiration bool   `json:"ignoreExpiration"`
 }
 
+// DefaultConfig returns the default configuration values
+func DefaultConfig() *Config {
+	return &Config{
+		DefaultFormat:    "pretty",
+		ColorEnabled:     true,
+		ShowClaims:       true,
+		ShowHeader:       false,
+		ShowSignature:    false,
+		ShowExpiration:   false,
+		DecodeSignature:  false,
+		IgnoreExpiration: false,
+	}
+}
+
 // defaultConfigPaths returns the default locations to look for config files
 func defaultConfigPaths() []string {
 	// Get user's home directory
@@ -32,7 +46,7 @@ func defaultConfigPaths() []string {
 
 	// Configuration file paths in order of precedence
 	return []string{
-		".jwtdebug.json",                                          // current directory
+		// Removed current directory lookup to avoid untrusted config precedence
 		filepath.Join(home, ".jwtdebug.json"),                     // user's home directory
 		filepath.Join(home, ".config", "jwtdebug.json"),           // XDG config directory
 		filepath.Join(home, ".config", "jwtdebug", "config.json"), // XDG config directory
@@ -42,16 +56,7 @@ func defaultConfigPaths() []string {
 // LoadConfig loads configuration from a file
 func LoadConfig() (*Config, error) {
 	// Default configuration
-	config := &Config{
-		DefaultFormat:    "pretty",
-		ColorEnabled:     true,
-		ShowClaims:       true,
-		ShowHeader:       false,
-		ShowSignature:    false,
-		ShowExpiration:   false,
-		DecodeSignature:  false,
-		IgnoreExpiration: false,
-	}
+	config := DefaultConfig()
 
 	// Look for config file in default locations
 	var configPath string
@@ -88,7 +93,7 @@ func LoadConfig() (*Config, error) {
 // ApplyConfig applies the configuration to CLI flags if they weren't explicitly set
 func ApplyConfig(config *Config) {
 	// Only set values from config if not explicitly set via command line
-	if !cli.FormatExplicit && cli.OutputFormat == "json" {
+	if !cli.FormatExplicit {
 		cli.OutputFormat = config.DefaultFormat
 	}
 
@@ -143,7 +148,7 @@ func SaveConfig(config *Config, path string) error {
 	}
 
 	// Write to file
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := os.WriteFile(path, data, 0600); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
