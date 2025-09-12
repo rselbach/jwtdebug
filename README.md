@@ -7,11 +7,11 @@ A modern command-line utility for debugging and analyzing JSON Web Tokens (JWTs)
 - Decode and display JWT token components (header, claims, signature)
 - Prettified claim display with human-readable formatting
 - Special handling for standard JWT claims with human-friendly labels
-- Verify token signatures with various algorithms (HMAC, RSA, ECDSA)
+- Verify token signatures with various algorithms (HMAC, RSA/PSS, ECDSA, EdDSA)
 - Check expiration status and validity periods
 - Colorized output for better readability
-- Support for multiple output formats (JSON, raw)
-- Decode base64-encoded signatures
+- Output formats: pretty, JSON, raw
+- Decode base64url-encoded signatures to hex
 - Multiple input methods (command-line arguments, piped input)
 - Persistent configuration via config files
 - Comprehensive test suite
@@ -26,8 +26,9 @@ jwtdebug/
 │   └── jwtdebug/      # Entry point and main application
 ├── internal/
 │   ├── cli/           # Command-line interface and flags
-│   ├── parser/        # JWT token parsing logic
-│   ├── printer/       # Output formatting
+│   ├── config/        # Config load/apply/save
+│   ├── parser/        # JWT token parsing + normalization
+│   ├── printer/       # Output formatting + expiration checks
 │   └── verification/  # Signature verification
 ```
 
@@ -52,13 +53,17 @@ This will download and install the latest version of jwtdebug automatically.
 git clone https://github.com/yourusername/jwtdebug.git
 cd jwtdebug
 
-# Build the binary
-./build.sh
-# or use make
-make
+# Build the binary (outputs to build/jwtdebug)
+make build
 
-# (Optional) Move to your PATH
-mv jwtdebug /usr/local/bin/
+# Run tests
+make test
+
+# (Optional) install to repo-local bin/ (respects GOBIN)
+make install
+
+# Run without building
+go run ./cmd/jwtdebug -h
 ```
 
 ### Upgrading
@@ -102,7 +107,11 @@ jwtdebug -verify -key public.pem eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOi
 -save-config    Save current settings to config file
 -sig            Show token signature
 -verify         Verify token signature (requires -key)
+-version        Show version information
 ```
+
+Notes:
+- Claims are parsed without verification unless `-verify -key` is supplied. A one‑line notice is printed to stderr so JSON/stdout consumers aren’t broken.
 
 For detailed information about configuration options, see [CONFIG.md](docs/CONFIG.md).
 
@@ -154,7 +163,7 @@ EXPIRATION:
 ### Building from source
 ```bash
 # Build the binary
-./build.sh
+make build
 ```
 
 ### Adding new features

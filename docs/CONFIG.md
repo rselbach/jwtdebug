@@ -22,12 +22,15 @@ The configuration file is a JSON file with the following structure:
 
 ## Configuration File Locations
 
-The tool looks for configuration files in the following locations, in order of precedence:
+The tool loads configuration from exactly one file, chosen in this order:
 
-1. Path specified with `-config` flag
-2. `.jwtdebug.json` in the current directory
-3. `.jwtdebug.json` in the user's home directory
-4. `.config/jwtdebug.json` in the user's home directory
+1. Path specified with `-config` flag.
+2. `~/.jwtdebug.json` (user home directory).
+3. `~/.config/jwtdebug.json`.
+4. `~/.config/jwtdebug/config.json`.
+
+For safety, the current working directory is not considered. This avoids accidentally
+loading untrusted configuration when running the tool in arbitrary folders.
 
 ## Creating a Configuration File
 
@@ -41,7 +44,8 @@ Run the tool with your preferred options and add the `-save-config` flag:
 jwtdebug -format json -color=false -header -save-config
 ```
 
-This will save your current settings to a configuration file in your home directory.
+This saves your current settings to `~/.jwtdebug.json` in your home directory.
+The `-config` flag controls loading, not where `-save-config` writes.
 
 ### 2. Manually Creating the File
 
@@ -51,11 +55,12 @@ You can also create the configuration file manually by creating a JSON file with
 
 Settings are applied in the following order of precedence (highest to lowest):
 
-1. Command-line flags explicitly set by the user
-2. Settings from the configuration file
-3. Default values
+1. Command-line flags that were explicitly set by the user.
+2. Settings loaded from the configuration file (picked using the search order above).
+3. Built‑in defaults.
 
-This means that command-line flags will always override settings from the configuration file, allowing you to temporarily override your saved preferences.
+Only flags you explicitly set on the command line override config values; otherwise
+the config file fills in those options.
 
 ## Configuration Options
 
