@@ -95,8 +95,8 @@ func processFromStdin() error {
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
-	// allow larger JWT inputs
-	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
+	// allow reasonable JWT inputs (up to 1MB to prevent DoS)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		line = parser.NormalizeTokenString(line)
