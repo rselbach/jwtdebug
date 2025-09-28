@@ -53,8 +53,12 @@ func main() {
 		cfg.DecodeSignature = cli.DecodeBase64
 		cfg.IgnoreExpiration = cli.IgnoreExpiration
 
+		savePath := ""
+		if cli.ConfigFile != "" {
+			savePath = cli.ConfigFile
+		}
 		// save config
-		if err := config.SaveConfig(cfg, ""); err != nil {
+		if err := config.SaveConfig(cfg, savePath); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: Failed to save config: %v\n", err)
 			os.Exit(1)
 		}
