@@ -53,8 +53,12 @@ func main() {
 		cfg.DecodeSignature = cli.DecodeBase64
 		cfg.IgnoreExpiration = cli.IgnoreExpiration
 
+		savePath := ""
+		if cli.ConfigFile != "" {
+			savePath = cli.ConfigFile
+		}
 		// save config
-		if err := config.SaveConfig(cfg, ""); err != nil {
+		if err := config.SaveConfig(cfg, savePath); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: Failed to save config: %v\n", err)
 			os.Exit(1)
 		}
@@ -95,8 +99,8 @@ func processFromStdin() error {
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
-	// allow larger JWT inputs
-	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
+	// allow reasonable JWT inputs (up to 1MB to prevent DoS)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		line = parser.NormalizeTokenString(line)
