@@ -3,6 +3,7 @@ package printer
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -10,21 +11,78 @@ import (
 	"github.com/fatih/color"
 )
 
-// formatValue returns a nicely formatted string representation of a value
+const (
+	// maxArrayItemsToDisplay is the maximum number of array items to display inline
+	// before showing a summary instead
+	maxArrayItemsToDisplay = 10
+)
+
+// formats a value for display within nested structures like arrays and objects
+func formatNestedValue(v interface{}) string {
+	switch val := v.(type) {
+	case string:
+		return sanitizeString(val)
+	case []interface{}:
+		if len(val) == 0 {
+			return "[]"
+		}
+		var b strings.Builder
+		b.WriteString("[")
+		for i, item := range val {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(formatNestedValue(item))
+		}
+		b.WriteString("]")
+		return b.String()
+	case map[string]interface{}:
+		if len(val) == 0 {
+			return "{}"
+		}
+		keys := make([]string, 0, len(val))
+		for k := range val {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		var b strings.Builder
+		b.WriteString("{")
+		for i, k := range keys {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(sanitizeString(k))
+			b.WriteString(": ")
+			b.WriteString(formatNestedValue(val[k]))
+		}
+		b.WriteString("}")
+		return b.String()
+	default:
+		return fmt.Sprintf("%v", val)
+	}
+}
+
+// returns a nicely formatted string representation of a value
 func formatValue(v interface{}) string {
 	switch val := v.(type) {
 	case []interface{}:
 		if len(val) == 0 {
 			return "[]"
 		}
-		if len(val) > 10 {
+		if len(val) > maxArrayItemsToDisplay {
 			return fmt.Sprintf("[array with %d items]", len(val))
 		}
-		var items []string
-		for _, item := range val {
-			items = append(items, fmt.Sprintf("%v", item))
+		var b strings.Builder
+		b.WriteString("[")
+		for i, item := range val {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(formatNestedValue(item))
 		}
-		return "[" + strings.Join(items, ", ") + "]"
+		b.WriteString("]")
+		return b.String()
 	case map[string]interface{}:
 		if len(val) == 0 {
 			return "{}"
@@ -38,7 +96,7 @@ func formatValue(v interface{}) string {
 	}
 }
 
-// tryParseTimestamp attempts to parse various timestamp formats and returns
+// attempts to parse various timestamp formats and returns
 // the time and whether parsing was successful
 func tryParseTimestamp(v interface{}) (time.Time, bool) {
 	var timestamp int64
@@ -108,8 +166,8 @@ func tryParseTimestamp(v interface{}) (time.Time, bool) {
 	return time.Unix(timestamp, 0), true
 }
 
-// formatTimestamp formats a value as a timestamp if possible
-// Returns the formatted string and whether it was detected as a timestamp
+// formats a value as a timestamp if possible.
+// returns the formatted string and whether it was detected as a timestamp
 func formatTimestamp(v interface{}) (string, bool) {
 	timeColor := color.New(color.FgYellow).SprintFunc()
 

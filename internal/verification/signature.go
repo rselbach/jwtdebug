@@ -16,6 +16,14 @@ func VerifyTokenSignature(tokenString string) error {
 		return errors.New("key file not provided (-key flag required)")
 	}
 
+	stat, err := os.Stat(cli.KeyFile)
+	if err != nil {
+		return fmt.Errorf("failed to stat key file: %w", err)
+	}
+	if !stat.Mode().IsRegular() {
+		return errors.New("key file must be a regular file")
+	}
+
 	// read key file
 	keyData, err := os.ReadFile(cli.KeyFile)
 	if err != nil {
@@ -53,7 +61,7 @@ func VerifyTokenSignature(tokenString string) error {
 			// Ed25519 public key
 			return jwt.ParseEdPublicKeyFromPEM(keyData)
 		default:
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			return nil, fmt.Errorf("unexpected signing method: %s", token.Header["alg"])
 		}
 	}, parseOpts...)
 

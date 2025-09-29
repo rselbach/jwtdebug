@@ -2,10 +2,10 @@ package verification
 
 import (
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/rselbach/jwtdebug/internal/cli"
+	"github.com/stretchr/testify/require"
 )
 
 func TestVerifyTokenSignature(t *testing.T) {
@@ -29,63 +29,69 @@ func TestVerifyTokenSignature(t *testing.T) {
 	// Invalid token (payload modified)
 	invalidToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkphbmUgRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
 
-	// Test cases
-	tests := []struct {
-		name         string
+	// Create a directory to test non-regular file handling
+	keyDir, err := os.MkdirTemp("", "jwtdebug-keydir")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(keyDir)
+
+	// test cases
+	tests := map[string]struct {
 		token        string
 		keyFile      string
 		expectError  bool
 		errorMessage string
 	}{
-		{
-			name:        "Valid token with correct key",
+		"Valid token with correct key": {
 			token:       validToken,
 			keyFile:     hmacKeyFile.Name(),
 			expectError: false,
 		},
-		{
-			name:         "Invalid token with correct key",
+		"Invalid token with correct key": {
 			token:        invalidToken,
 			keyFile:      hmacKeyFile.Name(),
 			expectError:  true,
 			errorMessage: "signature is invalid",
 		},
-		{
-			name:         "No key file provided",
+		"No key file provided": {
 			token:        validToken,
 			keyFile:      "",
 			expectError:  true,
 			errorMessage: "key file not provided",
 		},
-		{
-			name:         "Non-existent key file",
+		"Non-existent key file": {
 			token:        validToken,
 			keyFile:      "non_existent_file.key",
 			expectError:  true,
-			errorMessage: "failed to read key file",
+			errorMessage: "failed to stat key file",
+		},
+		"Key file is not regular": {
+			token:        validToken,
+			keyFile:      keyDir,
+			expectError:  true,
+			errorMessage: "key file must be a regular file",
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Set up the test
-			cli.KeyFile = tt.keyFile
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			r := require.New(t)
 
-			// Call the function
-			err := VerifyTokenSignature(tt.token)
+			// set up the test
+			cli.KeyFile = tc.keyFile
 
-			// Check the result
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				} else if tt.errorMessage != "" && !strings.Contains(err.Error(), tt.errorMessage) {
-					t.Errorf("Error message doesn't contain expected text.\nExpected: %s\nGot: %s",
-						tt.errorMessage, err.Error())
+			// call the function
+			err := VerifyTokenSignature(tc.token)
+
+			// check the result
+			if tc.expectError {
+				r.Error(err, "Expected error but got none")
+				if tc.errorMessage != "" {
+					r.Contains(err.Error(), tc.errorMessage, "Error message doesn't contain expected text")
 				}
 			} else {
-				if err != nil {
-					t.Errorf("Expected no error but got: %v", err)
-				}
+				r.NoError(err, "Expected no error")
 			}
 		})
 	}

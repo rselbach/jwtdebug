@@ -93,12 +93,7 @@ func (f stringFlag) Set(s string) error {
 
 // InitFlags initializes all command-line flags
 func InitFlags() {
-	// Set default values first
-	WithClaims = true
-	OutputFormat = "pretty"
-	OutputColor = true
-
-	// Define custom flags that track if they were set (with default values)
+	// define custom flags that track if they were set (with default values)
 	flag.Var(boolFlag{&HeaderExplicit, &WithHeader, false}, "header", "show token header")
 	flag.Var(boolFlag{&ClaimsExplicit, &WithClaims, true}, "claims", "show token claims (payload)")
 	flag.Var(boolFlag{&SignatureExplicit, &WithSignature, false}, "sig", "show token signature")

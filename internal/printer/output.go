@@ -40,14 +40,11 @@ func formatRaw(v interface{}) string {
 		sort.Strings(keys)
 
 		for _, k := range keys {
-			lines = append(lines, fmt.Sprintf("%s: %v", k, formatRawValue(val[k])))
+			lines = append(lines, fmt.Sprintf("%s: %s", sanitizeString(k), formatRawValue(val[k])))
 		}
 		return strings.Join(lines, "\n")
 	default:
-		if s, ok := v.(string); ok {
-			return sanitizeString(s)
-		}
-		return fmt.Sprintf("%v", v)
+		return formatRawValue(val)
 	}
 }
 
@@ -62,7 +59,7 @@ func formatRawValue(v interface{}) string {
 		}
 		var items []string
 		for _, item := range val {
-			items = append(items, fmt.Sprintf("%v", item))
+			items = append(items, formatNestedValue(item))
 		}
 		return "[" + strings.Join(items, ", ") + "]"
 	default:

@@ -92,10 +92,11 @@ func main() {
 func processFromStdin() error {
 	// check if stdin has data
 	stat, err := os.Stdin.Stat()
-	if err == nil {
-		if (stat.Mode() & os.ModeCharDevice) != 0 {
-			return fmt.Errorf("no token provided and no data on stdin")
-		}
+	if err != nil {
+		return fmt.Errorf("failed to stat stdin: %w", err)
+	}
+	if (stat.Mode() & os.ModeCharDevice) != 0 {
+		return fmt.Errorf("no token provided and no data on stdin")
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
