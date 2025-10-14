@@ -58,6 +58,7 @@ func TestNormalizeTokenString(t *testing.T) {
 		{"bearer abc.def.ghi", "abc.def.ghi"},
 		{"BEARER abc.def.ghi", "abc.def.ghi"},
 		{"token.only", "token.only"},
+		{"bearerabc.def.ghi", "bearerabc.def.ghi"},
 		{"   ", ""},
 	}
 	for _, c := range cases {

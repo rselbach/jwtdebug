@@ -3,45 +3,61 @@ package verification
 import (
 	"os"
 	"testing"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/rselbach/jwtdebug/internal/cli"
 	"github.com/stretchr/testify/require"
 )
 
 func TestVerifyTokenSignature(t *testing.T) {
-	// Create temporary files for testing
+	r := require.New(t)
+
 	hmacKeyFile, err := os.CreateTemp("", "hmac_key_*.txt")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-	defer os.Remove(hmacKeyFile.Name())
+	r.NoError(err)
+	t.Cleanup(func() { _ = os.Remove(hmacKeyFile.Name()) })
 
-	// Write test key to file
 	hmacKey := "your-256-bit-secret"
-	if _, err := hmacKeyFile.WriteString(hmacKey); err != nil {
-		t.Fatalf("Failed to write to temp file: %v", err)
-	}
-	hmacKeyFile.Close()
+	_, err = hmacKeyFile.WriteString(hmacKey)
+	r.NoError(err)
+	r.NoError(hmacKeyFile.Close())
 
-	// Valid token signed with the test key
+	keyDir, err := os.MkdirTemp("", "jwtdebug-keydir")
+	r.NoError(err)
+	t.Cleanup(func() { _ = os.RemoveAll(keyDir) })
+
 	validToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
-
-	// Invalid token (payload modified)
 	invalidToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkphbmUgRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
 
-	// Create a directory to test non-regular file handling
-	keyDir, err := os.MkdirTemp("", "jwtdebug-keydir")
-	if err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
+	now := time.Now()
+	sign := func(claims jwt.MapClaims) string {
+		tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+		signed, signErr := tok.SignedString([]byte(hmacKey))
+		r.NoError(signErr)
+		return signed
 	}
-	defer os.RemoveAll(keyDir)
 
-	// test cases
+	expiredToken := sign(jwt.MapClaims{
+		"sub":  "1234567890",
+		"name": "John Doe",
+		"exp":  now.Add(-time.Hour).Unix(),
+		"nbf":  now.Add(-2 * time.Hour).Unix(),
+	})
+
+	notYetValidToken := sign(jwt.MapClaims{
+		"sub":  "1234567890",
+		"name": "John Doe",
+		"nbf":  now.Add(time.Hour).Unix(),
+		"exp":  now.Add(2 * time.Hour).Unix(),
+	})
+
 	tests := map[string]struct {
-		token        string
-		keyFile      string
-		expectError  bool
-		errorMessage string
+		token            string
+		keyFile          string
+		ignoreExpiration bool
+		expectError      bool
+		errorMessage     string
 	}{
 		"Valid token with correct key": {
 			token:       validToken,
@@ -72,19 +88,42 @@ func TestVerifyTokenSignature(t *testing.T) {
 			expectError:  true,
 			errorMessage: "key file must be a regular file",
 		},
+		"Expired token fails when ignore-exp disabled": {
+			token:        expiredToken,
+			keyFile:      hmacKeyFile.Name(),
+			expectError:  true,
+			errorMessage: "token is expired",
+		},
+		"Expired token succeeds when ignore-exp enabled": {
+			token:            expiredToken,
+			keyFile:          hmacKeyFile.Name(),
+			ignoreExpiration: true,
+			expectError:      false,
+		},
+		"Token not yet valid still fails with ignore-exp": {
+			token:            notYetValidToken,
+			keyFile:          hmacKeyFile.Name(),
+			ignoreExpiration: true,
+			expectError:      true,
+			errorMessage:     "token is not valid yet",
+		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
 
-			// set up the test
+			prevKeyFile := cli.KeyFile
+			prevIgnore := cli.IgnoreExpiration
 			cli.KeyFile = tc.keyFile
+			cli.IgnoreExpiration = tc.ignoreExpiration
+			t.Cleanup(func() {
+				cli.KeyFile = prevKeyFile
+				cli.IgnoreExpiration = prevIgnore
+			})
 
-			// call the function
 			err := VerifyTokenSignature(tc.token)
 
-			// check the result
 			if tc.expectError {
 				r.Error(err, "Expected error but got none")
 				if tc.errorMessage != "" {

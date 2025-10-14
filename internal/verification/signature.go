@@ -31,18 +31,13 @@ func VerifyTokenSignature(tokenString string) error {
 	}
 
 	// parse the token with verification
-	var parseOpts []jwt.ParserOption
-	// Restrict accepted algorithms to known-safe set
-	parseOpts = append(parseOpts, jwt.WithValidMethods([]string{
+	parseOpts := []jwt.ParserOption{jwt.WithValidMethods([]string{
 		"HS256", "HS384", "HS512",
 		"RS256", "RS384", "RS512",
 		"PS256", "PS384", "PS512",
 		"ES256", "ES384", "ES512",
 		"EdDSA",
-	}))
-	if cli.IgnoreExpiration {
-		parseOpts = append(parseOpts, jwt.WithoutClaimsValidation())
-	}
+	})}
 
 	// parse using the provided key
 	_, err = jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
@@ -65,5 +60,70 @@ func VerifyTokenSignature(tokenString string) error {
 		}
 	}, parseOpts...)
 
+	if err != nil && cli.IgnoreExpiration && onlyExpirationErrors(err) {
+		return nil
+	}
+
 	return err
+}
+
+// onlyExpirationErrors reports whether the provided error (and any wrapped errors)
+// consists exclusively of expiration-related validation failures.
+func onlyExpirationErrors(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	hasExpiration := false
+
+	var walk func(error) bool
+	walk = func(e error) bool {
+		if e == nil {
+			return true
+		}
+
+		if errors.Is(e, jwt.ErrTokenExpired) {
+			hasExpiration = true
+		} else if errors.Is(e, jwt.ErrTokenInvalidClaims) {
+			// allowed wrapper, continue inspection
+		} else {
+			switch unw := e.(type) {
+			case interface{ Unwrap() []error }:
+				for _, inner := range unw.Unwrap() {
+					if !walk(inner) {
+						return false
+					}
+				}
+				return true
+			case interface{ Unwrap() error }:
+				if inner := unw.Unwrap(); inner != nil {
+					return walk(inner)
+				}
+			default:
+				return false
+			}
+		}
+
+		if multi, ok := e.(interface{ Unwrap() []error }); ok {
+			for _, inner := range multi.Unwrap() {
+				if !walk(inner) {
+					return false
+				}
+			}
+		} else if single, ok := e.(interface{ Unwrap() error }); ok {
+			if inner := single.Unwrap(); inner != nil {
+				if !walk(inner) {
+					return false
+				}
+			}
+		}
+
+		return true
+	}
+
+	if !walk(err) {
+		return false
+	}
+
+	return hasExpiration
 }

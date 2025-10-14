@@ -1,6 +1,10 @@
 package parser
 
-import "strings"
+import (
+	"strings"
+	"unicode"
+	"unicode/utf8"
+)
 
 // NormalizeTokenString trims whitespace and strips a leading "Bearer" prefix
 // in a case-insensitive, whitespace-tolerant way.
@@ -9,11 +13,15 @@ func NormalizeTokenString(s string) string {
 	if s == "" {
 		return s
 	}
-	// Case-insensitive, tolerate extra spaces: ^Bearer\s+
-	lower := strings.ToLower(s)
-	if strings.HasPrefix(lower, "bearer") {
-		rest := strings.TrimSpace(s[len("Bearer"):])
-		return rest
+	// Case-insensitive, tolerate extra spaces: only strip when followed by whitespace
+	if len(s) >= len("Bearer") && strings.EqualFold(s[:len("Bearer")], "bearer") {
+		rest := s[len("Bearer"):]
+		if rest != "" {
+			r, size := utf8.DecodeRuneInString(rest)
+			if unicode.IsSpace(r) {
+				return strings.TrimSpace(rest[size:])
+			}
+		}
 	}
 	return s
 }
