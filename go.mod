@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/fatih/color v1.15.0
-	github.com/golang-jwt/jwt/v5 v5.2.0
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/stretchr/testify v1.10.0
 )
 
