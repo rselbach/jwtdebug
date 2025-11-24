@@ -77,6 +77,16 @@ func LoadConfig() (*Config, error) {
 		return config, nil
 	}
 
+	// check file size to prevent DoS
+	stat, err := os.Stat(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat config file: %w", err)
+	}
+	const maxConfigSize = 1024 * 1024 // 1MB limit
+	if stat.Size() > maxConfigSize {
+		return nil, fmt.Errorf("config file too large (max 1MB)")
+	}
+
 	// Read and parse config file
 	data, err := os.ReadFile(configPath)
 	if err != nil {

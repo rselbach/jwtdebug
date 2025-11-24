@@ -65,6 +65,9 @@ func formatNestedValue(v interface{}) string {
 
 // returns a nicely formatted string representation of a value
 func formatValue(v interface{}) string {
+	if v == nil {
+		return "null"
+	}
 	switch val := v.(type) {
 	case []interface{}:
 		if len(val) == 0 {
@@ -104,6 +107,10 @@ func tryParseTimestamp(v interface{}) (time.Time, bool) {
 	// Try to convert to int64 from different numeric types
 	switch val := v.(type) {
 	case float64:
+		// check for overflow before conversion
+		if val > float64(1<<63-1) || val < float64(-1<<63) {
+			return time.Time{}, false
+		}
 		timestamp = int64(val)
 	case json.Number:
 		ts, err := val.Int64()

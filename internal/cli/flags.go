@@ -70,9 +70,10 @@ func (f boolFlag) Set(s string) error {
 }
 
 type stringFlag struct {
-	set      *bool
-	value    *string
-	defValue string
+	set       *bool
+	value     *string
+	defValue  string
+	validator func(string) error
 }
 
 func (f stringFlag) String() string {
@@ -82,11 +83,31 @@ func (f stringFlag) String() string {
 	return *f.value
 }
 func (f stringFlag) Set(s string) error {
+	if f.validator != nil {
+		if err := f.validator(s); err != nil {
+			return err
+		}
+	}
 	if f.set != nil {
 		*f.set = true
 	}
 	if f.value != nil {
 		*f.value = s
+	}
+	return nil
+}
+
+// ValidFormats defines the allowed output formats
+var ValidFormats = map[string]bool{
+	"pretty": true,
+	"json":   true,
+	"raw":    true,
+}
+
+// validateFormat checks if the format is valid
+func validateFormat(format string) error {
+	if !ValidFormats[format] {
+		return fmt.Errorf("invalid format %q, must be one of: pretty, json, raw", format)
 	}
 	return nil
 }
@@ -104,8 +125,8 @@ func InitFlags() {
 	flag.BoolVar(&SaveConfig, "save-config", false, "save current settings to config file")
 
 	// These flags need tracking for config file integration
-	flag.Var(stringFlag{&KeyFileExplicit, &KeyFile, ""}, "key", "key file for signature verification")
-	flag.Var(stringFlag{&FormatExplicit, &OutputFormat, "pretty"}, "format", "output format: pretty, json, or raw")
+	flag.Var(stringFlag{&KeyFileExplicit, &KeyFile, "", nil}, "key", "key file for signature verification")
+	flag.Var(stringFlag{&FormatExplicit, &OutputFormat, "pretty", validateFormat}, "format", "output format: pretty, json, or raw")
 	flag.Var(boolFlag{&ColorExplicit, &OutputColor, true}, "color", "colorize output")
 	flag.Var(boolFlag{&ExpirationExplicit, &ShowExpiration, false}, "expiry", "check token expiration status")
 	flag.Var(boolFlag{&DecodeBase64Explicit, &DecodeBase64, false}, "decode-sig", "decode signature from base64")
