@@ -33,6 +33,19 @@ func sanitizeString(s string) string {
 				b.WriteString("\\x1B")
 				continue
 			}
+			// Unicode C1 control characters (0x80-0x9F)
+			if r >= 0x80 && r <= 0x9F {
+				b.WriteString(fmt.Sprintf("\\u%04X", r))
+				continue
+			}
+			// zero-width chars, bidi overrides, and BOM that could be used for display attacks
+			if (r >= 0x200B && r <= 0x200F) || // zero-width chars
+				(r >= 0x202A && r <= 0x202E) || // bidi overrides
+				(r >= 0x2066 && r <= 0x2069) || // bidi isolates
+				r == 0xFEFF { // BOM/ZWNBSP
+				b.WriteString(fmt.Sprintf("\\u%04X", r))
+				continue
+			}
 			b.WriteRune(r)
 		}
 	}

@@ -76,49 +76,42 @@ func onlyExpirationErrors(err error) bool {
 
 	hasExpiration := false
 
+	// walk returns true if e (and all wrapped errors) are acceptable
+	// (either expiration errors or allowed wrappers like ErrTokenInvalidClaims)
 	var walk func(error) bool
 	walk = func(e error) bool {
 		if e == nil {
 			return true
 		}
 
-		if errors.Is(e, jwt.ErrTokenExpired) {
+		// check if this is directly the sentinel (not just wrapping it)
+		if e == jwt.ErrTokenExpired {
 			hasExpiration = true
-		} else if errors.Is(e, jwt.ErrTokenInvalidClaims) {
-			// allowed wrapper, continue inspection
-		} else {
-			switch unw := e.(type) {
-			case interface{ Unwrap() []error }:
-				for _, inner := range unw.Unwrap() {
-					if !walk(inner) {
-						return false
-					}
-				}
-				return true
-			case interface{ Unwrap() error }:
-				if inner := unw.Unwrap(); inner != nil {
-					return walk(inner)
-				}
-			default:
-				return false
-			}
+			return true
+		}
+		if e == jwt.ErrTokenInvalidClaims {
+			return true
 		}
 
+		// for any other error, we must unwrap and check children
 		if multi, ok := e.(interface{ Unwrap() []error }); ok {
 			for _, inner := range multi.Unwrap() {
 				if !walk(inner) {
 					return false
 				}
 			}
-		} else if single, ok := e.(interface{ Unwrap() error }); ok {
+			return true
+		}
+		if single, ok := e.(interface{ Unwrap() error }); ok {
 			if inner := single.Unwrap(); inner != nil {
-				if !walk(inner) {
-					return false
-				}
+				return walk(inner)
 			}
+			// wraps nil - this is a leaf that's not expiration-related
+			return false
 		}
 
-		return true
+		// leaf error that's not expiration-related
+		return false
 	}
 
 	if !walk(err) {
