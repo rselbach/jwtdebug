@@ -50,21 +50,41 @@ func TestProcessToken(t *testing.T) {
 }
 
 func TestNormalizeTokenString(t *testing.T) {
-	cases := []struct {
-		in  string
-		out string
+	tests := map[string]struct {
+		in   string
+		want string
 	}{
-		{"  Bearer    abc.def.ghi ", "abc.def.ghi"},
-		{"bearer abc.def.ghi", "abc.def.ghi"},
-		{"BEARER abc.def.ghi", "abc.def.ghi"},
-		{"token.only", "token.only"},
-		{"bearerabc.def.ghi", "bearerabc.def.ghi"},
-		{"   ", ""},
+		"bearer with extra spaces": {
+			in:   "  Bearer    abc.def.ghi ",
+			want: "abc.def.ghi",
+		},
+		"lowercase bearer": {
+			in:   "bearer abc.def.ghi",
+			want: "abc.def.ghi",
+		},
+		"uppercase bearer": {
+			in:   "BEARER abc.def.ghi",
+			want: "abc.def.ghi",
+		},
+		"token without bearer": {
+			in:   "token.only",
+			want: "token.only",
+		},
+		"bearer without space": {
+			in:   "bearerabc.def.ghi",
+			want: "bearerabc.def.ghi",
+		},
+		"whitespace only": {
+			in:   "   ",
+			want: "",
+		},
 	}
-	for _, c := range cases {
-		got := NormalizeTokenString(c.in)
-		if got != c.out {
-			t.Fatalf("NormalizeTokenString(%q) => %q, want %q", c.in, got, c.out)
-		}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			r := require.New(t)
+			got := NormalizeTokenString(tc.in)
+			r.Equal(tc.want, got)
+		})
 	}
 }

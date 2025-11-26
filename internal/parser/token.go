@@ -13,7 +13,6 @@ import (
 
 // ProcessToken parses and displays information about a JWT token
 func ProcessToken(tokenString string) error {
-	tokenString = NormalizeTokenString(tokenString)
 	// split the token into parts for analysis
 	parts := strings.Split(tokenString, ".")
 	if len(parts) != 3 {

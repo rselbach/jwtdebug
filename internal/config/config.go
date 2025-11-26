@@ -97,6 +97,11 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
+	// validate format if specified
+	if config.DefaultFormat != "" && !cli.ValidFormats[config.DefaultFormat] {
+		return nil, fmt.Errorf("invalid format %q in config, must be one of: pretty, json, raw", config.DefaultFormat)
+	}
+
 	return config, nil
 }
 

@@ -24,6 +24,12 @@ func VerifyTokenSignature(tokenString string) error {
 		return errors.New("key file must be a regular file")
 	}
 
+	// limit key file size to prevent DoS
+	const maxKeySize = 1024 * 1024 // 1MB
+	if stat.Size() > maxKeySize {
+		return errors.New("key file too large (max 1MB)")
+	}
+
 	// read key file
 	keyData, err := os.ReadFile(cli.KeyFile)
 	if err != nil {
@@ -60,36 +66,36 @@ func VerifyTokenSignature(tokenString string) error {
 		}
 	}, parseOpts...)
 
-	if err != nil && cli.IgnoreExpiration && onlyExpirationErrors(err) {
+	if err != nil && cli.IgnoreExpiration && onlyTimeValidationErrors(err) {
 		return nil
 	}
 
 	return err
 }
 
-// onlyExpirationErrors reports whether the provided error (and any wrapped errors)
-// consists exclusively of expiration-related validation failures.
-func onlyExpirationErrors(err error) bool {
+// onlyTimeValidationErrors reports whether the provided error (and any wrapped errors)
+// consists exclusively of time-related validation failures (expired or not yet valid).
+func onlyTimeValidationErrors(err error) bool {
 	if err == nil {
 		return false
 	}
 
-	hasExpiration := false
+	hasTimeError := false
 
 	// walk returns true if e (and all wrapped errors) are acceptable
-	// (either expiration errors or allowed wrappers like ErrTokenInvalidClaims)
+	// (either time-related errors or allowed wrappers like ErrTokenInvalidClaims)
 	var walk func(error) bool
 	walk = func(e error) bool {
 		if e == nil {
 			return true
 		}
 
-		// check if this is directly the sentinel (not just wrapping it)
-		if e == jwt.ErrTokenExpired {
-			hasExpiration = true
+		// check if this is directly a time-related sentinel
+		if errors.Is(e, jwt.ErrTokenExpired) || errors.Is(e, jwt.ErrTokenNotValidYet) {
+			hasTimeError = true
 			return true
 		}
-		if e == jwt.ErrTokenInvalidClaims {
+		if errors.Is(e, jwt.ErrTokenInvalidClaims) {
 			return true
 		}
 
@@ -106,11 +112,11 @@ func onlyExpirationErrors(err error) bool {
 			if inner := single.Unwrap(); inner != nil {
 				return walk(inner)
 			}
-			// wraps nil - this is a leaf that's not expiration-related
+			// wraps nil - this is a leaf that's not time-related
 			return false
 		}
 
-		// leaf error that's not expiration-related
+		// leaf error that's not time-related
 		return false
 	}
 
@@ -118,5 +124,5 @@ func onlyExpirationErrors(err error) bool {
 		return false
 	}
 
-	return hasExpiration
+	return hasTimeError
 }

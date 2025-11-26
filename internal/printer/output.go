@@ -18,13 +18,36 @@ var FormatMap = map[string]func(interface{}) string{
 	"raw":    formatRaw,
 }
 
-// formatJSON formats the data as pretty-printed JSON
+// formatJSON formats the data as pretty-printed JSON with sanitized strings
 func formatJSON(v interface{}) string {
-	data, err := json.MarshalIndent(v, "", "  ")
+	sanitized := sanitizeValue(v)
+	data, err := json.MarshalIndent(sanitized, "", "  ")
 	if err != nil {
 		return fmt.Sprintf("Error formatting JSON: %v", err)
 	}
 	return string(data)
+}
+
+// sanitizeValue recursively sanitizes all string values in a data structure
+func sanitizeValue(v interface{}) interface{} {
+	switch val := v.(type) {
+	case string:
+		return sanitizeString(val)
+	case map[string]interface{}:
+		result := make(map[string]interface{}, len(val))
+		for k, v := range val {
+			result[sanitizeString(k)] = sanitizeValue(v)
+		}
+		return result
+	case []interface{}:
+		result := make([]interface{}, len(val))
+		for i, item := range val {
+			result[i] = sanitizeValue(item)
+		}
+		return result
+	default:
+		return v
+	}
 }
 
 // formatRaw formats the data as a simple key-value listing
@@ -74,8 +97,8 @@ func formatRawValue(v interface{}) string {
 func FormatData(data interface{}) string {
 	formatter, ok := FormatMap[cli.OutputFormat]
 	if !ok {
-		// default to JSON if format is not supported
-		color.Yellow("Warning: Unsupported format '%s', using 'json' instead", cli.OutputFormat)
+		// default to JSON if format is not supported (write warning to stderr)
+		fmt.Fprintf(color.Error, "Warning: Unsupported format '%s', using 'json' instead\n", cli.OutputFormat)
 		return formatJSON(data)
 	}
 	return formatter(data)

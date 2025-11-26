@@ -47,12 +47,10 @@ func printPrettyHeader(header map[string]interface{}) {
 	// Print each key-value pair with proper alignment
 	keyColor := color.New(color.FgCyan).SprintFunc()
 	for _, k := range keys {
-		// Pad the key name for alignment
-		paddedKey := fmt.Sprintf("  %s:%s", keyColor(k), strings.Repeat(" ", maxKeyLen-len(k)+1))
-		if s, ok := header[k].(string); ok {
-			fmt.Printf("%s%s\n", paddedKey, sanitizeString(s))
-		} else {
-			fmt.Printf("%s%v\n", paddedKey, header[k])
-		}
+		// Pad the key name for alignment (sanitize key name too)
+		sanitizedKey := sanitizeString(k)
+		paddedKey := fmt.Sprintf("  %s:%s", keyColor(sanitizedKey), strings.Repeat(" ", maxKeyLen-len(k)+1))
+		// sanitize all values, not just strings
+		fmt.Printf("%s%s\n", paddedKey, formatValue(header[k]))
 	}
 }

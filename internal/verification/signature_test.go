@@ -100,12 +100,11 @@ func TestVerifyTokenSignature(t *testing.T) {
 			ignoreExpiration: true,
 			expectError:      false,
 		},
-		"Token not yet valid still fails with ignore-exp": {
+		"Token not yet valid succeeds with ignore-exp": {
 			token:            notYetValidToken,
 			keyFile:          hmacKeyFile.Name(),
 			ignoreExpiration: true,
-			expectError:      true,
-			errorMessage:     "token is not valid yet",
+			expectError:      false,
 		},
 	}
 
