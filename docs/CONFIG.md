@@ -24,7 +24,7 @@ The configuration file is a JSON file with the following structure:
 
 The tool loads configuration from exactly one file, chosen in this order:
 
-1. Path specified with `-config` flag.
+1. Path specified with `--config` flag.
 2. `~/.jwtdebug.json` (user home directory).
 3. `~/.config/jwtdebug.json`.
 4. `~/.config/jwtdebug/config.json`.
@@ -36,16 +36,16 @@ loading untrusted configuration when running the tool in arbitrary folders.
 
 You can create a configuration file in two ways:
 
-### 1. Using the `-save-config` Flag
+### 1. Using the `--save-config` Flag
 
-Run the tool with your preferred options and add the `-save-config` flag:
+Run the tool with your preferred options and add the `--save-config` flag:
 
 ```bash
-jwtdebug -format json -color=false -header -save-config
+jwtdebug -o json --no-color -H --save-config
 ```
 
 This saves your current settings to `~/.jwtdebug.json` in your home directory.
-The `-config` flag controls loading, not where `-save-config` writes.
+The `--config` flag controls loading, not where `--save-config` writes.
 
 ### 2. Manually Creating the File
 
@@ -64,14 +64,46 @@ the config file fills in those options.
 
 ## Configuration Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `defaultFormat` | Default output format (pretty, json, or raw) | pretty |
-| `colorEnabled` | Enable colored output | true |
-| `defaultKeyFile` | Default key file for signature verification | "" |
-| `showHeader` | Show token header by default | false |
-| `showClaims` | Show token claims by default | true |
-| `showSignature` | Show token signature by default | false |
-| `showExpiration` | Check token expiration by default | false |
-| `decodeSignature` | Decode base64 signature by default | false |
-| `ignoreExpiration` | Ignore token expiration when verifying | false |
+| Option | CLI Flag | Description | Default |
+|--------|----------|-------------|---------|
+| `defaultFormat` | `-o, --output` | Output format (pretty, json, raw) | pretty |
+| `colorEnabled` | `--color` | Enable colored output | true |
+| `defaultKeyFile` | `-k, --key-file` | Default key file for verification | "" |
+| `showHeader` | `-H, --header` | Show token header by default | false |
+| `showClaims` | `-c, --claims` | Show token claims by default | true |
+| `showSignature` | `-s, --signature` | Show token signature by default | false |
+| `showExpiration` | `-e, --expiration` | Check expiration by default | false |
+| `decodeSignature` | `--decode-signature` | Decode base64 signature by default | false |
+| `ignoreExpiration` | `--ignore-expiration` | Ignore expiration when verifying | false |
+
+## Example Configurations
+
+### Minimal JSON output (for scripting)
+
+```json
+{
+  "defaultFormat": "json",
+  "colorEnabled": false,
+  "showClaims": true
+}
+```
+
+### Full debug mode
+
+```json
+{
+  "showHeader": true,
+  "showClaims": true,
+  "showSignature": true,
+  "showExpiration": true
+}
+```
+
+### With default key for verification
+
+```json
+{
+  "defaultKeyFile": "~/.keys/jwt-public.pem",
+  "showExpiration": true
+}
+```

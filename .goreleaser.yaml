@@ -17,6 +17,8 @@ builds:
     binary: jwtdebug
     ldflags:
       - -X github.com/rselbach/jwtdebug/internal/cli.Version={{ .Version }}
+      - -X github.com/rselbach/jwtdebug/internal/cli.Commit={{ .ShortCommit }}
+      - -X github.com/rselbach/jwtdebug/internal/cli.BuildDate={{ .Date }}
       - -s
       - -w
     env:
@@ -38,7 +40,7 @@ brews:
       token: "{{ .Env.GITHUB_TOKEN }}"
     download_strategy: CurlDownloadStrategy
     test: |
-      system "#{bin}/jwtdebug -version"
+      system "#{bin}/jwtdebug --version"
 
 archives:
   - formats: [tar.gz]

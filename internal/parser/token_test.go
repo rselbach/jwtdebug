@@ -44,50 +44,81 @@ func TestProcessToken(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
-			err := ProcessToken(tc.token)
+			result := ProcessToken(tc.token)
 
 			if tc.token == "" {
-				r.Error(err, "Expected an error for empty token")
+				r.NotNil(result.Err, "Expected an error for empty token")
 				return
 			}
 
 			// Simulate token parsing
 			if tc.shouldFail {
-				r.Error(err, "Expected an error for token: %s", tc.token)
+				r.NotNil(result.Err, "Expected an error for token: %s", tc.token)
 			} else {
-				r.NoError(err, "Did not expect an error for valid token")
+				r.Nil(result.Err, "Did not expect an error for valid token")
 			}
 		})
 	}
 }
 
 func TestNormalizeTokenString(t *testing.T) {
+	// Sample JWT-like tokens (valid base64url format)
+	validJWT := "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NSJ9.signature123"
+
 	tests := map[string]struct {
 		in   string
 		want string
 	}{
+		"bearer prefix": {
+			in:   "Bearer " + validJWT,
+			want: validJWT,
+		},
 		"bearer with extra spaces": {
-			in:   "  Bearer    abc.def.ghi ",
-			want: "abc.def.ghi",
+			in:   "  Bearer    " + validJWT + " ",
+			want: validJWT,
 		},
 		"lowercase bearer": {
-			in:   "bearer abc.def.ghi",
-			want: "abc.def.ghi",
+			in:   "bearer " + validJWT,
+			want: validJWT,
 		},
-		"uppercase bearer": {
-			in:   "BEARER abc.def.ghi",
-			want: "abc.def.ghi",
+		"cookie format": {
+			in:   "_auth_token=" + validJWT,
+			want: validJWT,
 		},
-		"token without bearer": {
-			in:   "token.only",
-			want: "token.only",
+		"cookie with spaces": {
+			in:   "  session_cookie = " + validJWT + "; HttpOnly",
+			want: validJWT,
 		},
-		"bearer without space": {
-			in:   "bearerabc.def.ghi",
-			want: "bearerabc.def.ghi",
+		"authorization header": {
+			in:   "Authorization: Bearer " + validJWT,
+			want: validJWT,
+		},
+		"set-cookie header": {
+			in:   "Set-Cookie: token=" + validJWT + "; Path=/; Secure",
+			want: validJWT,
+		},
+		"json with token field": {
+			in:   `{"access_token":"` + validJWT + `"}`,
+			want: validJWT,
+		},
+		"raw jwt": {
+			in:   validJWT,
+			want: validJWT,
+		},
+		"jwt with whitespace": {
+			in:   "  " + validJWT + "  ",
+			want: validJWT,
+		},
+		"no jwt found returns original": {
+			in:   "not.a.jwt",
+			want: "not.a.jwt",
 		},
 		"whitespace only": {
 			in:   "   ",
+			want: "",
+		},
+		"empty string": {
+			in:   "",
 			want: "",
 		},
 	}

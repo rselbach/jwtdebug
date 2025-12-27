@@ -56,14 +56,14 @@ func TestFormatTimestamp(t *testing.T) {
 		input  interface{}
 		wantOK bool
 	}{
-		"valid unix timestamp":    {input: float64(1704067200), wantOK: true},
-		"valid RFC3339":           {input: "2024-01-01T00:00:00Z", wantOK: true},
-		"invalid string":          {input: "not-a-time", wantOK: false},
-		"empty string":            {input: "", wantOK: false},
-		"out of range timestamp":  {input: float64(100), wantOK: false},
-		"bool type":               {input: false, wantOK: false},
-		"nil":                     {input: nil, wantOK: false},
-		"json.Number valid":       {input: json.Number("1704067200"), wantOK: true},
+		"valid unix timestamp":     {input: float64(1704067200), wantOK: true},
+		"valid RFC3339":            {input: "2024-01-01T00:00:00Z", wantOK: true},
+		"invalid string":           {input: "not-a-time", wantOK: false},
+		"empty string":             {input: "", wantOK: false},
+		"out of range timestamp":   {input: float64(100), wantOK: false},
+		"bool type":                {input: false, wantOK: false},
+		"nil":                      {input: nil, wantOK: false},
+		"json.Number valid":        {input: json.Number("1704067200"), wantOK: true},
 		"json.Number out of range": {input: json.Number("100"), wantOK: false},
 	}
 	for name, tc := range tests {

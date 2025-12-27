@@ -12,9 +12,14 @@ BUILD_DIR=build
 # Version from git: if a tag exists, use the tag, otherwise use the commit hash
 # GoReleaser sets GORELEASER_CURRENT_TAG if building through GoReleaser
 VERSION=$(shell if [ -n "$(GORELEASER_CURRENT_TAG)" ]; then echo $(GORELEASER_CURRENT_TAG); else git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD; fi)
+COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_DATE=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Use linker flags to provide version/build info
-LDFLAGS=-ldflags "-s -w -X github.com/rselbach/jwtdebug/internal/cli.Version=$(VERSION)"
+LDFLAGS=-ldflags "-s -w \
+	-X github.com/rselbach/jwtdebug/internal/cli.Version=$(VERSION) \
+	-X github.com/rselbach/jwtdebug/internal/cli.Commit=$(COMMIT) \
+	-X github.com/rselbach/jwtdebug/internal/cli.BuildDate=$(BUILD_DATE)"
 
 all: build
 

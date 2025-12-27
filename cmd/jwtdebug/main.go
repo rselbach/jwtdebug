@@ -10,29 +10,49 @@ import (
 	"github.com/fatih/color"
 
 	"github.com/rselbach/jwtdebug/internal/cli"
+	"github.com/rselbach/jwtdebug/internal/completions"
 	"github.com/rselbach/jwtdebug/internal/config"
+	"github.com/rselbach/jwtdebug/internal/constants"
 	"github.com/rselbach/jwtdebug/internal/parser"
 )
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	// initialize flags
 	cli.InitFlags()
 	flag.Parse()
 
+	// show help and exit if requested
+	if cli.ShowHelp {
+		cli.PrintUsage()
+		return constants.ExitSuccess
+	}
+
 	// show version and exit if requested
 	if cli.ShowVersion {
-		fmt.Printf("jwtdebug version: %s\n", cli.Version)
-		return
+		printVersion()
+		return constants.ExitSuccess
+	}
+
+	// generate shell completion if requested
+	if cli.CompletionShell != "" {
+		return generateCompletion(cli.CompletionShell)
 	}
 
 	// load configuration from file
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to load config: %v\n", err)
-		os.Exit(1)
+		return constants.ExitConfigError
 	}
 	// apply configuration (only for options not explicitly set via CLI)
 	config.ApplyConfig(cfg)
+
+	// apply --no-color flag
+	cli.ApplyNoColor()
 
 	// honor color flag globally
 	color.NoColor = !cli.OutputColor
@@ -60,57 +80,123 @@ func main() {
 		// save config
 		if err := config.SaveConfig(cfg, savePath); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: Failed to save config: %v\n", err)
-			os.Exit(1)
+			return constants.ExitConfigError
 		}
 		color.Green("Configuration saved successfully.")
 
 		// if no token provided, exit after saving config
 		if flag.NArg() == 0 {
-			return
+			return constants.ExitSuccess
 		}
+	}
+
+	// check for explicit stdin marker "-"
+	if flag.NArg() == 1 && flag.Arg(0) == "-" {
+		return processFromStdin(true)
 	}
 
 	// process tokens from arguments or stdin
 	if flag.NArg() == 0 {
-		if err := processFromStdin(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-		return
+		return processFromStdin(false)
 	}
 
 	// process tokens provided as arguments
 	for _, token := range flag.Args() {
 		token = parser.NormalizeTokenString(token)
-		if err := parser.ProcessToken(token); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+		exitCode := processToken(token)
+		if exitCode != constants.ExitSuccess {
+			return exitCode
 		}
+	}
+
+	return constants.ExitSuccess
+}
+
+func printVersion() {
+	fmt.Printf("jwtdebug version %s\n", cli.Version)
+	if cli.Verbose || cli.Commit != "unknown" {
+		fmt.Printf("  commit:     %s\n", cli.Commit)
+		fmt.Printf("  built:      %s\n", cli.BuildDate)
 	}
 }
 
-func processFromStdin() error {
+func generateCompletion(shell string) int {
+	switch strings.ToLower(shell) {
+	case "bash":
+		completions.PrintBash()
+	case "zsh":
+		completions.PrintZsh()
+	case "fish":
+		completions.PrintFish()
+	default:
+		fmt.Fprintf(os.Stderr, "Error: unsupported shell %q (supported: bash, zsh, fish)\n", shell)
+		return constants.ExitError
+	}
+	return constants.ExitSuccess
+}
+
+func processToken(token string) int {
+	result := parser.ProcessToken(token)
+	if result.Err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", result.Err)
+		return result.ExitCode
+	}
+	return result.ExitCode
+}
+
+func processFromStdin(explicit bool) int {
 	// check if stdin has data
 	stat, err := os.Stdin.Stat()
 	if err != nil {
-		return fmt.Errorf("failed to stat stdin: %w", err)
+		fmt.Fprintf(os.Stderr, "Error: failed to stat stdin: %v\n", err)
+		return constants.ExitError
 	}
+
+	// if stdin is a terminal and not explicitly requested, show hint
 	if (stat.Mode() & os.ModeCharDevice) != 0 {
-		return fmt.Errorf("no token provided and no data on stdin")
+		if explicit {
+			// explicit "-" argument, wait for input
+			if !cli.Quiet {
+				fmt.Fprintln(os.Stderr, "Reading token from stdin... (press Ctrl+D when done)")
+			}
+		} else {
+			fmt.Fprintln(os.Stderr, "Error: no token provided")
+			fmt.Fprintln(os.Stderr, "")
+			fmt.Fprintln(os.Stderr, "Usage: jwtdebug [options] <token>")
+			fmt.Fprintln(os.Stderr, "       jwtdebug [options] -           # read from stdin")
+			fmt.Fprintln(os.Stderr, "       command | jwtdebug [options]   # read from pipe")
+			fmt.Fprintln(os.Stderr, "")
+			fmt.Fprintln(os.Stderr, "Run 'jwtdebug --help' for more information.")
+			return constants.ExitError
+		}
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
 	// allow reasonable JWT inputs (up to 1MB to prevent DoS)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	hasToken := false
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		line = parser.NormalizeTokenString(line)
 		if line == "" {
 			continue
 		}
-		if err := parser.ProcessToken(line); err != nil {
-			return err
+		hasToken = true
+		exitCode := processToken(line)
+		if exitCode != constants.ExitSuccess {
+			return exitCode
 		}
 	}
-	return scanner.Err()
+
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to read stdin: %v\n", err)
+		return constants.ExitError
+	}
+
+	if !hasToken {
+		fmt.Fprintln(os.Stderr, "Error: no token provided on stdin")
+		return constants.ExitError
+	}
+
+	return constants.ExitSuccess
 }
