@@ -2,13 +2,15 @@ package printer
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/rselbach/jwtdebug/internal/cli"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFormatJSON(t *testing.T) {
+	r := require.New(t)
+
 	// test data
 	testData := map[string]interface{}{
 		"key1": "value1",
@@ -22,19 +24,19 @@ func TestFormatJSON(t *testing.T) {
 	// parse back to ensure it's valid JSON
 	var parsed map[string]interface{}
 	err := json.Unmarshal([]byte(result), &parsed)
-	if err != nil {
-		t.Fatalf("Failed to parse JSON: %v", err)
-	}
+	r.NoError(err, "Failed to parse JSON")
 
 	// check if all keys are present
 	for k, v := range testData {
-		if val, ok := parsed[k]; !ok || !compareValues(v, val) {
-			t.Errorf("Key %s: expected %v, got %v", k, v, val)
-		}
+		val, ok := parsed[k]
+		r.True(ok, "Key %s not found", k)
+		r.True(compareValues(v, val), "Key %s: expected %v, got %v", k, v, val)
 	}
 }
 
 func TestFormatRaw(t *testing.T) {
+	r := require.New(t)
+
 	// test data
 	testData := map[string]interface{}{
 		"key1": "value1",
@@ -51,13 +53,13 @@ func TestFormatRaw(t *testing.T) {
 	}
 
 	for _, line := range expectedLines {
-		if !strings.Contains(result, line) {
-			t.Errorf("Raw output doesn't contain expected line '%s'. Got: %s", line, result)
-		}
+		r.Contains(result, line, "Raw output doesn't contain expected line")
 	}
 }
 
 func TestFormatData(t *testing.T) {
+	r := require.New(t)
+
 	// test data
 	testData := map[string]interface{}{
 		"key1": "value1",
@@ -67,16 +69,12 @@ func TestFormatData(t *testing.T) {
 	// test with JSON format
 	cli.OutputFormat = "json"
 	jsonResult := FormatData(testData)
-	if !strings.Contains(jsonResult, "\"key1\": \"value1\"") {
-		t.Errorf("JSON formatter not used correctly")
-	}
+	r.Contains(jsonResult, "\"key1\": \"value1\"", "JSON formatter not used correctly")
 
 	// test with unsupported format (should default to JSON)
 	cli.OutputFormat = "unsupported"
 	defaultResult := FormatData(testData)
-	if !strings.Contains(defaultResult, "\"key1\": \"value1\"") {
-		t.Errorf("Default formatter (JSON) not used for unsupported format")
-	}
+	r.Contains(defaultResult, "\"key1\": \"value1\"", "Default formatter (JSON) not used for unsupported format")
 }
 
 // helper function to compare values

@@ -1,23 +1,28 @@
 package printer
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestSanitizeString(t *testing.T) {
-	cases := []struct {
+	cases := map[string]struct {
 		in  string
 		out string
 	}{
-		{"plain", "plain"},
-		{"line1\nline2", "line1\\nline2"},
-		{"a\tb", "a\\tb"},
-		{"a\rb", "a\\rb"},
-		{"\x1b[31mred\x1b[0m", "\\x1B[31mred\\x1B[0m"},
-		{"bell:\a", "bell:\\x07"},
+		"plain text unchanged":    {"plain", "plain"},
+		"escapes newline":         {"line1\nline2", "line1\\nline2"},
+		"escapes tab":             {"a\tb", "a\\tb"},
+		"escapes carriage return": {"a\rb", "a\\rb"},
+		"escapes ANSI codes":      {"\x1b[31mred\x1b[0m", "\\x1B[31mred\\x1B[0m"},
+		"escapes bell character":  {"bell:\a", "bell:\\x07"},
 	}
-	for _, c := range cases {
-		got := sanitizeString(c.in)
-		if got != c.out {
-			t.Fatalf("sanitizeString(%q) => %q, want %q", c.in, got, c.out)
-		}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			r := require.New(t)
+			got := sanitizeString(tc.in)
+			r.Equal(tc.out, got, "sanitizeString(%q)", tc.in)
+		})
 	}
 }

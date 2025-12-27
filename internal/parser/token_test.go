@@ -27,6 +27,18 @@ func TestProcessToken(t *testing.T) {
 			shouldFail:   true,
 			errorMessage: "invalid token format",
 		},
+		"Malformed base64 in header": {
+			token:      "!!!invalid-base64!!!.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature",
+			shouldFail: true,
+		},
+		"Malformed base64 in payload": {
+			token:      "eyJhbGciOiJIUzI1NiJ9.!!!invalid-base64!!!.signature",
+			shouldFail: true,
+		},
+		"Token with unusual but valid claims": {
+			token:      "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJuZXN0ZWQiOnsia2V5IjoidmFsdWUifSwiYXJyYXkiOlsxLDIsM10sImVtcHR5Ijp7fX0.",
+			shouldFail: false,
+		},
 	}
 
 	for name, tc := range tests {

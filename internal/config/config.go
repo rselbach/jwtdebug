@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/rselbach/jwtdebug/internal/cli"
+	"github.com/rselbach/jwtdebug/internal/constants"
 )
 
 // Config represents the application configuration
@@ -82,9 +83,8 @@ func LoadConfig() (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat config file: %w", err)
 	}
-	const maxConfigSize = 1024 * 1024 // 1MB limit
-	if stat.Size() > maxConfigSize {
-		return nil, fmt.Errorf("config file too large (max 1MB)")
+	if stat.Size() > constants.MaxFileSizeBytes {
+		return nil, fmt.Errorf("config file too large (max %d bytes)", constants.MaxFileSizeBytes)
 	}
 
 	// Read and parse config file

@@ -26,6 +26,7 @@ var (
 	ConfigFile       string
 	SaveConfig       bool
 	ShowVersion      bool
+	Quiet            bool
 
 	// Track if flags were explicitly set by user
 	HeaderExplicit           bool
@@ -138,6 +139,9 @@ func InitFlags() {
 	// Version flag
 	flag.BoolVar(&ShowVersion, "version", false, "show version information")
 
+	// Quiet flag
+	flag.BoolVar(&Quiet, "quiet", false, "suppress informational notices")
+
 	flag.Usage = PrintUsage
 }
 
@@ -155,8 +159,8 @@ func PrintUsage() {
 	fmt.Fprintf(os.Stderr, "  jwtdebug -format json -save-config  # Save settings to config file\n")
 }
 
-// EnableAllOutputs enables all output options if the -all flag is set
-func EnableAllOutputs() {
+// ApplyAllFlag enables all output options if the -all flag is set
+func ApplyAllFlag() {
 	if ShowAll {
 		WithHeader = true
 		WithClaims = true

@@ -11,8 +11,8 @@ import (
 	"github.com/rselbach/jwtdebug/internal/cli"
 )
 
-// FormatMap maps the output format to the corresponding formatter function
-var FormatMap = map[string]func(interface{}) string{
+// formatMap maps the output format to the corresponding formatter function
+var formatMap = map[string]func(interface{}) string{
 	"pretty": formatJSON, // "pretty" uses JSON for non-claims data
 	"json":   formatJSON,
 	"raw":    formatRaw,
@@ -95,7 +95,7 @@ func formatRawValue(v interface{}) string {
 
 // FormatData returns a string representation of data in the specified format
 func FormatData(data interface{}) string {
-	formatter, ok := FormatMap[cli.OutputFormat]
+	formatter, ok := formatMap[cli.OutputFormat]
 	if !ok {
 		// default to JSON if format is not supported (write warning to stderr)
 		fmt.Fprintf(color.Error, "Warning: Unsupported format '%s', using 'json' instead\n", cli.OutputFormat)

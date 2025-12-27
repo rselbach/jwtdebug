@@ -8,6 +8,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/rselbach/jwtdebug/internal/cli"
+	"github.com/rselbach/jwtdebug/internal/constants"
 )
 
 // VerifyTokenSignature verifies the token signature using the provided key file
@@ -25,9 +26,8 @@ func VerifyTokenSignature(tokenString string) error {
 	}
 
 	// limit key file size to prevent DoS
-	const maxKeySize = 1024 * 1024 // 1MB
-	if stat.Size() > maxKeySize {
-		return errors.New("key file too large (max 1MB)")
+	if stat.Size() > constants.MaxFileSizeBytes {
+		return fmt.Errorf("key file too large (max %d bytes)", constants.MaxFileSizeBytes)
 	}
 
 	// read key file

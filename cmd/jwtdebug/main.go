@@ -38,7 +38,7 @@ func main() {
 	color.NoColor = !cli.OutputColor
 
 	// enable all output options if -all flag is set
-	cli.EnableAllOutputs()
+	cli.ApplyAllFlag()
 
 	// handle save config request
 	if cli.SaveConfig {

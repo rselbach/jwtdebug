@@ -9,12 +9,18 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/rselbach/jwtdebug/internal/cli"
 )
 
 const (
 	// maxArrayItemsToDisplay is the maximum number of array items to display inline
 	// before showing a summary instead
 	maxArrayItemsToDisplay = 10
+)
+
+var (
+	minTimestamp = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC).Unix()
+	maxTimestamp = time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC).Unix()
 )
 
 // formats a value for display within nested structures like arrays and objects
@@ -163,10 +169,7 @@ func tryParseTimestamp(v interface{}) (time.Time, bool) {
 
 	// Check if the timestamp is in a reasonable range
 	// (between 2000-01-01 and 2100-01-01)
-	minTime := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC).Unix()
-	maxTime := time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC).Unix()
-
-	if timestamp < minTime || timestamp > maxTime {
+	if timestamp < minTimestamp || timestamp > maxTimestamp {
 		return time.Time{}, false
 	}
 
@@ -200,6 +203,9 @@ func PrintVerificationFailure(err error) {
 // PrintUnverifiedNotice prints a single-line warning that claims are unverified.
 // Printed to stderr to avoid breaking machine-readable stdout formats.
 func PrintUnverifiedNotice() {
+	if cli.Quiet {
+		return
+	}
 	notice := color.New(color.FgYellow).Sprintf("Note: claims are unverified. Use -verify -key to validate.")
 	fmt.Fprintln(color.Error, notice)
 }

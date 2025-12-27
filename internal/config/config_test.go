@@ -39,7 +39,7 @@ func TestLoadSaveConfig(t *testing.T) {
 	// Save original CLI config file
 	originalConfigFile := cli.ConfigFile
 	cli.ConfigFile = configPath
-	defer func() { cli.ConfigFile = originalConfigFile }()
+	t.Cleanup(func() { cli.ConfigFile = originalConfigFile })
 
 	// Load config
 	loadedConfig, err := LoadConfig()
@@ -63,7 +63,7 @@ func TestLoadConfigErrors(t *testing.T) {
 	// Save original CLI config file
 	originalConfigFile := cli.ConfigFile
 	cli.ConfigFile = "/path/to/non-existent-config.json"
-	defer func() { cli.ConfigFile = originalConfigFile }()
+	t.Cleanup(func() { cli.ConfigFile = originalConfigFile })
 
 	// Test loading from non-existent file
 	_, err := LoadConfig()

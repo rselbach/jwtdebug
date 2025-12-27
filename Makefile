@@ -33,7 +33,7 @@ test:
 	@echo "Running tests..."
 	@go test -v ./...
 
-install: build
+install:
 	@echo "Installing $(BINARY_NAME) version $(VERSION)..."
-	@cp $(BUILD_DIR)/$(BINARY_NAME) $(GOBIN)/
+	@go install $(LDFLAGS) ./cmd/jwtdebug
 	@echo "Installation successful!"

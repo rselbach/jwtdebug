@@ -8,6 +8,12 @@ import (
 // sanitizeString removes ANSI escape initiators and control characters
 // from a string, rendering control bytes as visible escape sequences.
 // It preserves printable runes and replaces \n/\r/\t with escaped forms.
+//
+// Security: This function also escapes Unicode bidirectional override characters
+// (U+202A-U+202E, U+2066-U+2069), zero-width characters (U+200B-U+200F), and BOM
+// (U+FEFF). These invisible characters can be exploited in "Trojan Source" attacks
+// to make malicious code appear benign or to manipulate text rendering in security
+// contexts like displaying JWT claims.
 func sanitizeString(s string) string {
 	if s == "" {
 		return s
