@@ -48,11 +48,28 @@ jwtdebug --raw-claims token | jq '.sub'
 
 ## Installation
 
-### Homebrew (recommended)
+### Homebrew (macOS/Linux)
 
 ```bash
-brew tap rselbach/tap
-brew install jwtdebug
+brew install rselbach/tap/jwtdebug
+```
+
+### Download Binary
+
+Pre-built binaries are available on the [Releases page](https://github.com/rselbach/jwtdebug/releases).
+
+```bash
+# Linux (x86_64)
+curl -sL https://github.com/rselbach/jwtdebug/releases/latest/download/jwtdebug_Linux_x86_64.tar.gz | tar xz
+sudo mv jwtdebug /usr/local/bin/
+
+# macOS (Apple Silicon)
+curl -sL https://github.com/rselbach/jwtdebug/releases/latest/download/jwtdebug_Darwin_arm64.tar.gz | tar xz
+sudo mv jwtdebug /usr/local/bin/
+
+# macOS (Intel)
+curl -sL https://github.com/rselbach/jwtdebug/releases/latest/download/jwtdebug_Darwin_x86_64.tar.gz | tar xz
+sudo mv jwtdebug /usr/local/bin/
 ```
 
 ### From Source
