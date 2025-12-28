@@ -176,6 +176,12 @@ VERIFICATION:
 ✓ Signature verified successfully
 ```
 
+**Key formats by algorithm:**
+- **HMAC** (HS256/384/512): Raw secret bytes in a file (e.g., `echo -n "your-secret" > secret.key`)
+- **RSA** (RS256/384/512, PS256/384/512): PEM-encoded public key
+- **ECDSA** (ES256/384/512): PEM-encoded EC public key
+- **EdDSA**: PEM-encoded Ed25519 public key
+
 ### Pipe to jq
 
 ```bash
