@@ -16,6 +16,9 @@ A fast, modern command-line utility for decoding and debugging JSON Web Tokens (
 # Install via Homebrew
 brew install rselbach/tap/jwtdebug
 
+# Try it now with this sample token:
+jwtdebug eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+
 # Decode a token
 jwtdebug eyJhbGciOiJIUzI1NiIs...
 
