@@ -1,0 +1,140 @@
+.TH JWTDEBUG 1 "December 2024" "jwtdebug" "User Commands"
+.SH NAME
+jwtdebug \- decode and debug JSON Web Tokens
+.SH SYNOPSIS
+.B jwtdebug
+[\fIOPTIONS\fR] \fITOKEN\fR
+.br
+.B jwtdebug
+[\fIOPTIONS\fR] \fB\-\fR
+.br
+\fICOMMAND\fR | \fBjwtdebug\fR [\fIOPTIONS\fR]
+.SH DESCRIPTION
+.B jwtdebug
+is a command-line utility for decoding, inspecting, and verifying JSON Web Tokens (JWTs).
+Tokens are processed locally and never leave your machine.
+.PP
+By default, jwtdebug uses smart extraction to find JWTs in any input, including
+Authorization headers, cookies, and JSON responses.
+.SH OPTIONS
+.SS Display Options
+.TP
+.BR \-a ", " \-\-all
+Show all token parts (header, claims, signature, expiration).
+.TP
+.BR \-H ", " \-\-header
+Show token header.
+.TP
+.BR \-c ", " \-\-claims
+Show token claims (default: true).
+.TP
+.BR \-s ", " \-\-signature
+Show token signature.
+.TP
+.BR \-e ", " \-\-expiration
+Check token expiration status.
+.TP
+.B \-\-decode\-signature
+Decode signature from base64 to hex.
+.TP
+.B \-\-raw\-claims
+Output only raw claims JSON, suitable for piping to jq(1).
+.SS Verification Options
+.TP
+.BR \-V ", " \-\-verify
+Verify token signature.
+.TP
+.BR \-k ", " \-\-key\-file " " \fIFILE\fR
+Key file for signature verification.
+.TP
+.B \-\-ignore\-expiration
+Ignore token expiration when verifying signature.
+.SS Output Options
+.TP
+.BR \-o ", " \-\-output " " \fIFORMAT\fR
+Output format: \fBpretty\fR (default), \fBjson\fR, or \fBraw\fR.
+.TP
+.B \-\-color
+Enable colored output (default).
+.TP
+.B \-\-no\-color
+Disable colored output.
+.SS Input Options
+.TP
+.B \-\-strict
+Disable smart extraction; expect exact JWT input.
+.SS Other Options
+.TP
+.BR \-q ", " \-\-quiet
+Suppress informational notices.
+.TP
+.BR \-v ", " \-\-verbose
+Enable verbose output.
+.TP
+.B \-\-config " " \fIFILE\fR
+Path to configuration file.
+.TP
+.B \-\-save\-config
+Save current settings to configuration file.
+.TP
+.B \-\-completion " " \fISHELL\fR
+Generate shell completion script (bash, zsh, fish).
+.TP
+.B \-\-version
+Show version information.
+.TP
+.BR \-h ", " \-\-help
+Show help message.
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+General error.
+.TP
+.B 2
+Invalid token format.
+.TP
+.B 3
+Signature verification failed.
+.TP
+.B 4
+Configuration error.
+.SH EXAMPLES
+.TP
+Decode a token:
+.B jwtdebug
+eyJhbGciOiJIUzI1NiIs...
+.TP
+Decode from clipboard (macOS):
+pbpaste |
+.B jwtdebug
+.TP
+Show all token information:
+.B jwtdebug \-a
+eyJhbGciOiJIUzI1NiIs...
+.TP
+Verify signature with RSA public key:
+.B jwtdebug \-V \-k
+public.pem token
+.TP
+Pipe claims to jq:
+.B jwtdebug \-\-raw\-claims
+token | jq '.sub'
+.SH FILES
+.TP
+.I ~/.jwtdebug.json
+User configuration file.
+.TP
+.I ~/.config/jwtdebug.json
+Alternative configuration location.
+.TP
+.I ~/.config/jwtdebug/config.json
+Alternative configuration location.
+.SH SEE ALSO
+.BR jq (1)
+.SH AUTHORS
+Roberto Selbach
+.SH BUGS
+Report bugs at https://github.com/rselbach/jwtdebug/issues
