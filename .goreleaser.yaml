@@ -29,7 +29,7 @@ builds:
       - windows
 
 brews:
-  - homepage: github.com/rselbach/jwtdebug
+  - homepage: https://github.com/rselbach/jwtdebug
     license: MIT
     description: >-
       A command line tool to decode, verify and generate JWTs (JSON Web Tokens).
@@ -38,7 +38,7 @@ brews:
       name: homebrew-tap
       branch: main
       # Token for Homebrew tap repository
-      token: "{{ .Env.GITHUB_TOKEN }}"
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     download_strategy: CurlDownloadStrategy
     test: |
       system "#{bin}/jwtdebug --version"
