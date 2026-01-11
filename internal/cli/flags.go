@@ -141,39 +141,149 @@ func registerStringFlag(long, short string, set *bool, value *string, defValue s
 	}
 }
 
+func registerDeprecatedBoolAlias(name string, set *bool, value *bool, defValue bool, usage string) {
+	flag.Var(boolFlag{set, value, defValue}, name, usage)
+}
+
+func registerDeprecatedStringAlias(name string, set *bool, value *string, defValue string, validator func(string) error, usage string) {
+	flag.Var(stringFlag{set, value, defValue, validator}, name, usage)
+}
+
+type flagAlias struct {
+	name  string
+	usage string
+}
+
+type boolFlagDef struct {
+	long     string
+	short    string
+	set      *bool
+	value    *bool
+	defValue bool
+	usage    string
+	aliases  []flagAlias
+}
+
+type stringFlagDef struct {
+	long      string
+	short     string
+	set       *bool
+	value     *string
+	defValue  string
+	validator func(string) error
+	usage     string
+	aliases   []flagAlias
+}
+
+func registerBoolFlagDef(def boolFlagDef) {
+	registerBoolFlag(def.long, def.short, def.set, def.value, def.defValue, def.usage)
+	for _, alias := range def.aliases {
+		registerDeprecatedBoolAlias(alias.name, def.set, def.value, def.defValue, alias.usage)
+	}
+}
+
+func registerStringFlagDef(def stringFlagDef) {
+	registerStringFlag(def.long, def.short, def.set, def.value, def.defValue, def.validator, def.usage)
+	for _, alias := range def.aliases {
+		registerDeprecatedStringAlias(alias.name, def.set, def.value, def.defValue, def.validator, alias.usage)
+	}
+}
+
+func registerBoolFlags(defs []boolFlagDef) {
+	for _, def := range defs {
+		registerBoolFlagDef(def)
+	}
+}
+
+func registerStringFlags(defs []stringFlagDef) {
+	for _, def := range defs {
+		registerStringFlagDef(def)
+	}
+}
+
 // InitFlags initializes all command-line flags
 func InitFlags() {
 	// Output selection flags
-	registerBoolFlag("header", "H", &HeaderExplicit, &WithHeader, false, "show token header")
-	registerBoolFlag("claims", "c", &ClaimsExplicit, &WithClaims, true, "show token claims (payload)")
-	registerBoolFlag("signature", "s", &SignatureExplicit, &WithSignature, false, "show token signature")
-	registerBoolFlag("all", "a", nil, &ShowAll, false, "show all token parts and info")
+	registerBoolFlags([]boolFlagDef{
+		{long: "header", short: "H", set: &HeaderExplicit, value: &WithHeader, defValue: false, usage: "show token header"},
+		{long: "claims", short: "c", set: &ClaimsExplicit, value: &WithClaims, defValue: true, usage: "show token claims (payload)"},
+		{long: "signature", short: "s", set: &SignatureExplicit, value: &WithSignature, defValue: false, usage: "show token signature"},
+		{long: "all", short: "a", value: &ShowAll, defValue: false, usage: "show all token parts and info"},
+	})
 
 	// Verification flags
 	flag.BoolVar(&VerifySignature, "verify", false, "verify token signature (requires --key-file)")
 	flag.BoolVar(&VerifySignature, "V", false, "verify token signature (shorthand)")
-	registerStringFlag("key-file", "k", &KeyFileExplicit, &KeyFile, "", nil, "key file for signature verification")
-	// Keep -key as hidden alias for backward compatibility
-	flag.Var(stringFlag{&KeyFileExplicit, &KeyFile, "", nil}, "key", "key file (deprecated: use --key-file)")
-	registerBoolFlag("ignore-expiration", "", &IgnoreExpirationExplicit, &IgnoreExpiration, false, "ignore token expiration when verifying")
-	// Keep -ignore-exp as hidden alias for backward compatibility
-	flag.Var(boolFlag{&IgnoreExpirationExplicit, &IgnoreExpiration, false}, "ignore-exp", "ignore expiration (deprecated: use --ignore-expiration)")
+	registerStringFlags([]stringFlagDef{
+		{
+			long:  "key-file",
+			short: "k",
+			set:   &KeyFileExplicit,
+			value: &KeyFile,
+			usage: "key file for signature verification",
+			aliases: []flagAlias{
+				{name: "key", usage: "key file (deprecated: use --key-file)"},
+			},
+		},
+	})
+	registerBoolFlags([]boolFlagDef{
+		{
+			long:     "ignore-expiration",
+			set:      &IgnoreExpirationExplicit,
+			value:    &IgnoreExpiration,
+			defValue: false,
+			usage:    "ignore token expiration when verifying",
+			aliases: []flagAlias{
+				{name: "ignore-exp", usage: "ignore expiration (deprecated: use --ignore-expiration)"},
+			},
+		},
+	})
 
 	// Output format flags
-	registerStringFlag("output", "o", &FormatExplicit, &OutputFormat, "pretty", validateFormat, "output format: pretty, json, or raw")
-	// Keep -format as hidden alias for backward compatibility
-	flag.Var(stringFlag{&FormatExplicit, &OutputFormat, "pretty", validateFormat}, "format", "output format (deprecated: use --output)")
-	registerBoolFlag("color", "", &ColorExplicit, &OutputColor, true, "colorize output")
+	registerStringFlags([]stringFlagDef{
+		{
+			long:      "output",
+			short:     "o",
+			set:       &FormatExplicit,
+			value:     &OutputFormat,
+			defValue:  "pretty",
+			validator: validateFormat,
+			usage:     "output format: pretty, json, or raw",
+			aliases: []flagAlias{
+				{name: "format", usage: "output format (deprecated: use --output)"},
+			},
+		},
+	})
+	registerBoolFlags([]boolFlagDef{
+		{long: "color", set: &ColorExplicit, value: &OutputColor, defValue: true, usage: "colorize output"},
+		{long: "raw-claims", value: &RawClaims, defValue: false, usage: "output only raw claims JSON (for piping)"},
+	})
 	flag.BoolVar(&NoColor, "no-color", false, "disable colored output")
-	registerBoolFlag("raw-claims", "", nil, &RawClaims, false, "output only raw claims JSON (for piping)")
 
 	// Expiration flags
-	registerBoolFlag("expiration", "e", &ExpirationExplicit, &ShowExpiration, false, "check token expiration status")
-	// Keep -expiry as hidden alias for backward compatibility
-	flag.Var(boolFlag{&ExpirationExplicit, &ShowExpiration, false}, "expiry", "check expiration (deprecated: use --expiration)")
-	registerBoolFlag("decode-signature", "", &DecodeBase64Explicit, &DecodeBase64, false, "decode signature from base64 to hex")
-	// Keep -decode-sig as hidden alias for backward compatibility
-	flag.Var(boolFlag{&DecodeBase64Explicit, &DecodeBase64, false}, "decode-sig", "decode signature (deprecated: use --decode-signature)")
+	registerBoolFlags([]boolFlagDef{
+		{
+			long:     "expiration",
+			short:    "e",
+			set:      &ExpirationExplicit,
+			value:    &ShowExpiration,
+			defValue: false,
+			usage:    "check token expiration status",
+			aliases: []flagAlias{
+				{name: "expiry", usage: "check expiration (deprecated: use --expiration)"},
+			},
+		},
+		{
+			long:     "decode-signature",
+			set:      &DecodeBase64Explicit,
+			value:    &DecodeBase64,
+			defValue: false,
+			usage:    "decode signature from base64 to hex",
+			aliases: []flagAlias{
+				{name: "decode-sig", usage: "decode signature (deprecated: use --decode-signature)"},
+			},
+		},
+	})
 
 	// Config flags
 	flag.StringVar(&ConfigFile, "config", "", "path to config file")
@@ -185,8 +295,10 @@ func InitFlags() {
 	flag.BoolVar(&ShowHelp, "h", false, "show help message (shorthand)")
 
 	// Verbosity flags
-	registerBoolFlag("quiet", "q", nil, &Quiet, false, "suppress informational notices")
-	registerBoolFlag("verbose", "v", nil, &Verbose, false, "enable verbose output for debugging")
+	registerBoolFlags([]boolFlagDef{
+		{long: "quiet", short: "q", value: &Quiet, defValue: false, usage: "suppress informational notices"},
+		{long: "verbose", short: "v", value: &Verbose, defValue: false, usage: "enable verbose output for debugging"},
+	})
 
 	// Shell completion
 	flag.StringVar(&CompletionShell, "completion", "", "generate shell completion script (bash, zsh, fish)")

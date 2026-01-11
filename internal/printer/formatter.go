@@ -19,9 +19,36 @@ const (
 )
 
 var (
-	minTimestamp = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC).Unix()
-	maxTimestamp = time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC).Unix()
+	minTimestamp     = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC).Unix()
+	maxTimestamp     = time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC).Unix()
+	timestampFormats = []string{
+		"2006-01-02T15:04:05Z07:00",
+		"2006-01-02T15:04:05",
+		"2006-01-02 15:04:05",
+		"2006-01-02",
+		time.RFC1123,
+		time.RFC1123Z,
+		time.RFC822,
+		time.RFC822Z,
+		time.RFC850,
+	}
 )
+
+func formatInlineArray(items []interface{}, formatItem func(interface{}) string) string {
+	if len(items) == 0 {
+		return "[]"
+	}
+	var b strings.Builder
+	b.WriteString("[")
+	for i, item := range items {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(formatItem(item))
+	}
+	b.WriteString("]")
+	return b.String()
+}
 
 // formats a value for display within nested structures like arrays and objects
 func formatNestedValue(v interface{}) string {
@@ -29,19 +56,7 @@ func formatNestedValue(v interface{}) string {
 	case string:
 		return sanitizeString(val)
 	case []interface{}:
-		if len(val) == 0 {
-			return "[]"
-		}
-		var b strings.Builder
-		b.WriteString("[")
-		for i, item := range val {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			b.WriteString(formatNestedValue(item))
-		}
-		b.WriteString("]")
-		return b.String()
+		return formatInlineArray(val, formatNestedValue)
 	case map[string]interface{}:
 		if len(val) == 0 {
 			return "{}"
@@ -76,31 +91,18 @@ func formatValue(v interface{}) string {
 	}
 	switch val := v.(type) {
 	case []interface{}:
-		if len(val) == 0 {
-			return "[]"
-		}
 		if len(val) > maxArrayItemsToDisplay {
 			return fmt.Sprintf("[array with %d items]", len(val))
 		}
-		var b strings.Builder
-		b.WriteString("[")
-		for i, item := range val {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			b.WriteString(formatNestedValue(item))
-		}
-		b.WriteString("]")
-		return b.String()
+		return formatInlineArray(val, formatNestedValue)
 	case map[string]interface{}:
 		if len(val) == 0 {
 			return "{}"
 		}
 		return fmt.Sprintf("{object with %d keys}", len(val))
+	case string:
+		return sanitizeString(val)
 	default:
-		if s, ok := v.(string); ok {
-			return sanitizeString(s)
-		}
 		return fmt.Sprintf("%v", v)
 	}
 }
@@ -137,19 +139,7 @@ func tryParseTimestamp(v interface{}) (time.Time, bool) {
 		}
 
 		// Try common variations
-		formats := []string{
-			"2006-01-02T15:04:05Z07:00", // ISO8601 with timezone
-			"2006-01-02T15:04:05",       // ISO8601 without timezone
-			"2006-01-02 15:04:05",       // Common datetime format
-			"2006-01-02",                // Date only
-			time.RFC1123,
-			time.RFC1123Z,
-			time.RFC822,
-			time.RFC822Z,
-			time.RFC850,
-		}
-
-		for _, format := range formats {
+		for _, format := range timestampFormats {
 			t, err := time.Parse(format, val)
 			if err == nil {
 				return t, true
@@ -158,11 +148,11 @@ func tryParseTimestamp(v interface{}) (time.Time, bool) {
 
 		// If all string parsing failed, try to convert to a number
 		// as it might be a numeric timestamp in string form
-		if numVal, err := strconv.ParseInt(val, 10, 64); err == nil {
-			timestamp = numVal
-		} else {
+		numVal, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
 			return time.Time{}, false
 		}
+		timestamp = numVal
 	default:
 		return time.Time{}, false
 	}

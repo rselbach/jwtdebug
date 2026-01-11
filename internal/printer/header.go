@@ -7,23 +7,15 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/golang-jwt/jwt/v5"
-
-	"github.com/rselbach/jwtdebug/internal/cli"
 )
 
 // PrintHeader prints the token header
 func PrintHeader(token *jwt.Token) {
-	headerTitle := color.New(color.FgBlue, color.Bold).SprintFunc()
-	fmt.Println(headerTitle("HEADER:"))
-
-	if cli.OutputFormat == "pretty" || cli.OutputFormat == "" {
+	headerTitle := color.New(color.FgBlue, color.Bold)
+	printSection("HEADER:", headerTitle, func() {
 		// For pretty format, print in aligned key-value format
 		printPrettyHeader(token.Header)
-	} else {
-		fmt.Println(FormatData(token.Header))
-	}
-
-	fmt.Println()
+	}, token.Header)
 }
 
 // printPrettyHeader prints the header in a nicely formatted and aligned way

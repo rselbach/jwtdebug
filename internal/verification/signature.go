@@ -11,6 +11,42 @@ import (
 	"github.com/rselbach/jwtdebug/internal/constants"
 )
 
+var validAlgorithms = []string{"HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA"}
+
+type keyParser func([]byte) (interface{}, error)
+
+var keyParsers = map[string]keyParser{
+	"HS256": parseHMACKey,
+	"HS384": parseHMACKey,
+	"HS512": parseHMACKey,
+	"RS256": parseRSAPublicKey,
+	"RS384": parseRSAPublicKey,
+	"RS512": parseRSAPublicKey,
+	"PS256": parseRSAPublicKey,
+	"PS384": parseRSAPublicKey,
+	"PS512": parseRSAPublicKey,
+	"ES256": parseECPublicKey,
+	"ES384": parseECPublicKey,
+	"ES512": parseECPublicKey,
+	"EdDSA": parseEdPublicKey,
+}
+
+func parseHMACKey(keyData []byte) (interface{}, error) {
+	return keyData, nil
+}
+
+func parseRSAPublicKey(keyData []byte) (interface{}, error) {
+	return jwt.ParseRSAPublicKeyFromPEM(keyData)
+}
+
+func parseECPublicKey(keyData []byte) (interface{}, error) {
+	return jwt.ParseECPublicKeyFromPEM(keyData)
+}
+
+func parseEdPublicKey(keyData []byte) (interface{}, error) {
+	return jwt.ParseEdPublicKeyFromPEM(keyData)
+}
+
 // VerifyTokenSignature verifies the token signature using the provided key file
 func VerifyTokenSignature(tokenString string) error {
 	if cli.KeyFile == "" {
@@ -37,33 +73,15 @@ func VerifyTokenSignature(tokenString string) error {
 	}
 
 	// parse the token with verification
-	parseOpts := []jwt.ParserOption{jwt.WithValidMethods([]string{
-		"HS256", "HS384", "HS512",
-		"RS256", "RS384", "RS512",
-		"PS256", "PS384", "PS512",
-		"ES256", "ES384", "ES512",
-		"EdDSA",
-	})}
+	parseOpts := []jwt.ParserOption{jwt.WithValidMethods(validAlgorithms)}
 
 	// parse using the provided key
 	_, err = jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// check signature algorithm
-		switch token.Method.Alg() {
-		case "HS256", "HS384", "HS512":
-			// HMAC algorithms use the key directly
-			return keyData, nil
-		case "RS256", "RS384", "RS512", "PS256", "PS384", "PS512":
-			// RSA and RSA-PSS algorithms use an RSA public key
-			return jwt.ParseRSAPublicKeyFromPEM(keyData)
-		case "ES256", "ES384", "ES512":
-			// ECDSA algorithms use an EC public key
-			return jwt.ParseECPublicKeyFromPEM(keyData)
-		case "EdDSA":
-			// Ed25519 public key
-			return jwt.ParseEdPublicKeyFromPEM(keyData)
-		default:
+		parser, ok := keyParsers[token.Method.Alg()]
+		if !ok {
 			return nil, fmt.Errorf("unexpected signing method: %s", token.Header["alg"])
 		}
+		return parser(keyData)
 	}, parseOpts...)
 
 	if err != nil && cli.IgnoreExpiration && onlyTimeValidationErrors(err) {

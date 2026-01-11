@@ -107,42 +107,46 @@ func LoadConfig() (*Config, error) {
 
 // ApplyConfig applies the configuration to CLI flags if they weren't explicitly set
 func ApplyConfig(config *Config) {
-	// Only set values from config if not explicitly set via command line
 	if !cli.FormatExplicit {
 		cli.OutputFormat = config.DefaultFormat
 	}
-
 	if !cli.ColorExplicit {
 		cli.OutputColor = config.ColorEnabled
 	}
-
 	if !cli.KeyFileExplicit && cli.KeyFile == "" {
 		cli.KeyFile = config.DefaultKeyFile
 	}
-
 	if !cli.HeaderExplicit {
 		cli.WithHeader = config.ShowHeader
 	}
-
 	if !cli.ClaimsExplicit {
 		cli.WithClaims = config.ShowClaims
 	}
-
 	if !cli.SignatureExplicit {
 		cli.WithSignature = config.ShowSignature
 	}
-
 	if !cli.ExpirationExplicit {
 		cli.ShowExpiration = config.ShowExpiration
 	}
-
 	if !cli.DecodeBase64Explicit {
 		cli.DecodeBase64 = config.DecodeSignature
 	}
-
 	if !cli.IgnoreExpirationExplicit {
 		cli.IgnoreExpiration = config.IgnoreExpiration
 	}
+}
+
+// UpdateFromCLI updates the config with CLI values.
+func UpdateFromCLI(config *Config) {
+	config.DefaultFormat = cli.OutputFormat
+	config.ColorEnabled = cli.OutputColor
+	config.DefaultKeyFile = cli.KeyFile
+	config.ShowHeader = cli.WithHeader
+	config.ShowClaims = cli.WithClaims
+	config.ShowSignature = cli.WithSignature
+	config.ShowExpiration = cli.ShowExpiration
+	config.DecodeSignature = cli.DecodeBase64
+	config.IgnoreExpiration = cli.IgnoreExpiration
 }
 
 // SaveConfig saves the current configuration to a file

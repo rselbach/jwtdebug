@@ -11,13 +11,6 @@ import (
 	"github.com/rselbach/jwtdebug/internal/cli"
 )
 
-// formatMap maps the output format to the corresponding formatter function
-var formatMap = map[string]func(interface{}) string{
-	"pretty": formatJSON, // "pretty" uses JSON for non-claims data
-	"json":   formatJSON,
-	"raw":    formatRaw,
-}
-
 // formatJSON formats the data as pretty-printed JSON with sanitized strings
 func formatJSON(v interface{}) string {
 	sanitized := sanitizeValue(v)
@@ -85,26 +78,34 @@ func formatRawValue(v interface{}) string {
 			items = append(items, formatNestedValue(item))
 		}
 		return "[" + strings.Join(items, ", ") + "]"
+	case string:
+		return sanitizeString(val)
 	default:
-		if s, ok := v.(string); ok {
-			return sanitizeString(s)
-		}
 		return fmt.Sprintf("%v", v)
 	}
 }
 
 // FormatData returns a string representation of data in the specified format
 func FormatData(data interface{}) string {
-	formatter, ok := formatMap[cli.OutputFormat]
-	if !ok {
+	switch cli.OutputFormat {
+	case "pretty", "json":
+		return formatJSON(data)
+	case "raw":
+		return formatRaw(data)
+	default:
 		// default to JSON if format is not supported (write warning to stderr)
 		fmt.Fprintf(color.Error, "Warning: Unsupported format '%s', using 'json' instead\n", cli.OutputFormat)
 		return formatJSON(data)
 	}
-	return formatter(data)
 }
 
-// PrintData prints the data to stdout in the specified format
-func PrintData(data interface{}) {
+func printSection(title string, titleColor *color.Color, pretty func(), data interface{}) {
+	fmt.Println(titleColor.SprintFunc()(title))
+	if cli.OutputFormat == "pretty" || cli.OutputFormat == "" {
+		pretty()
+		fmt.Println()
+		return
+	}
 	fmt.Println(FormatData(data))
+	fmt.Println()
 }

@@ -21,83 +21,100 @@ func main() {
 }
 
 func run() int {
-	// initialize flags
 	cli.InitFlags()
 	flag.Parse()
 
-	// show help and exit if requested
+	if exitCode, handled := handleHelpVersion(); handled {
+		return exitCode
+	}
+
+	if exitCode, handled := handleCompletion(); handled {
+		return exitCode
+	}
+
+	cfg, exitCode := loadConfig()
+	if exitCode != constants.ExitSuccess {
+		return exitCode
+	}
+
+	cli.ApplyNoColor()
+
+	color.NoColor = !cli.OutputColor
+
+	cli.ApplyAllFlag()
+
+	if exitCode, handled := handleSaveConfig(cfg); handled {
+		return exitCode
+	}
+
+	return processInputTokens()
+}
+
+func handleHelpVersion() (int, bool) {
 	if cli.ShowHelp {
 		cli.PrintUsage()
-		return constants.ExitSuccess
+		return constants.ExitSuccess, true
 	}
 
-	// show version and exit if requested
 	if cli.ShowVersion {
 		printVersion()
-		return constants.ExitSuccess
+		return constants.ExitSuccess, true
 	}
 
-	// generate shell completion if requested
-	if cli.CompletionShell != "" {
-		return generateCompletion(cli.CompletionShell)
+	return constants.ExitSuccess, false
+}
+
+func handleCompletion() (int, bool) {
+	if cli.CompletionShell == "" {
+		return constants.ExitSuccess, false
 	}
 
-	// load configuration from file
+	return generateCompletion(cli.CompletionShell), true
+}
+
+func loadConfig() (*config.Config, int) {
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to load config: %v\n", err)
-		return constants.ExitConfigError
+		return nil, constants.ExitConfigError
 	}
-	// apply configuration (only for options not explicitly set via CLI)
+
 	config.ApplyConfig(cfg)
+	return cfg, constants.ExitSuccess
+}
 
-	// apply --no-color flag
-	cli.ApplyNoColor()
-
-	// honor color flag globally
-	color.NoColor = !cli.OutputColor
-
-	// enable all output options if -all flag is set
-	cli.ApplyAllFlag()
-
-	// handle save config request
-	if cli.SaveConfig {
-		// update config with current settings
-		cfg.DefaultFormat = cli.OutputFormat
-		cfg.ColorEnabled = cli.OutputColor
-		cfg.DefaultKeyFile = cli.KeyFile
-		cfg.ShowHeader = cli.WithHeader
-		cfg.ShowClaims = cli.WithClaims
-		cfg.ShowSignature = cli.WithSignature
-		cfg.ShowExpiration = cli.ShowExpiration
-		cfg.DecodeSignature = cli.DecodeBase64
-		cfg.IgnoreExpiration = cli.IgnoreExpiration
-
-		savePath := ""
-		if cli.ConfigFile != "" {
-			savePath = cli.ConfigFile
-		}
-		// save config
-		if err := config.SaveConfig(cfg, savePath); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Failed to save config: %v\n", err)
-			return constants.ExitConfigError
-		}
-		color.Green("Configuration saved successfully.")
-
-		// if no token provided, exit after saving config
-		if flag.NArg() == 0 {
-			return constants.ExitSuccess
-		}
+func handleSaveConfig(cfg *config.Config) (int, bool) {
+	if !cli.SaveConfig {
+		return constants.ExitSuccess, false
 	}
+
+	config.UpdateFromCLI(cfg)
+
+	savePath := cli.ConfigFile
+	if err := config.SaveConfig(cfg, savePath); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to save config: %v\n", err)
+		return constants.ExitConfigError, true
+	}
+	color.Green("Configuration saved successfully.")
+
+	// if no token provided, exit after saving config
+	if flag.NArg() == 0 {
+		return constants.ExitSuccess, true
+	}
+
+	return constants.ExitSuccess, false
+}
+
+func processInputTokens() int {
+	argCount := flag.NArg()
 
 	// check for explicit stdin marker "-"
-	if flag.NArg() == 1 && flag.Arg(0) == "-" {
-		return processFromStdin(true)
+	if argCount == 0 {
+		return processFromStdin(false)
 	}
 
-	// process tokens from arguments or stdin
-	if flag.NArg() == 0 {
-		return processFromStdin(false)
+	if argCount == 1 && flag.Arg(0) == "-" {
+		return processFromStdin(true)
 	}
 
 	// process tokens provided as arguments
@@ -159,7 +176,8 @@ func processFromStdin(explicit bool) int {
 			if !cli.Quiet {
 				fmt.Fprintln(os.Stderr, "Reading token from stdin... (press Ctrl+D when done)")
 			}
-		} else {
+		}
+		if !explicit {
 			fmt.Fprintln(os.Stderr, "Error: no token provided")
 			fmt.Fprintln(os.Stderr, "")
 			fmt.Fprintln(os.Stderr, "Usage: jwtdebug [options] <token>")

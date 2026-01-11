@@ -21,46 +21,56 @@ func CheckExpiration(token *jwt.Token) {
 
 	now := time.Now().Unix()
 
-	// check for "exp" claim
-	if exp, ok := claims["exp"]; ok {
-		if t, ok := tryParseTimestamp(exp); ok {
-			expUnix := t.Unix()
-			expTimeFormatted := t.Format(time.RFC3339)
-			if now > expUnix {
-				color.Red("✗ Token expired at %s (%.0f seconds ago)", expTimeFormatted, float64(now-expUnix))
-			} else {
-				color.Green("✓ Token expires at %s (%.0f seconds from now)", expTimeFormatted, float64(expUnix-now))
-			}
-		} else {
-			fmt.Printf("Unrecognized expiration value: %v\n", exp)
-		}
-	} else {
+	handleTimestampClaim(claims, "exp", func() {
 		fmt.Println("No expiration claim found")
-	}
-
-	// check for "nbf" (not before) claim
-	if nbf, ok := claims["nbf"]; ok {
-		if t, ok := tryParseTimestamp(nbf); ok {
-			nbfUnix := t.Unix()
-			nbfTimeFormatted := t.Format(time.RFC3339)
-			if now < nbfUnix {
-				color.Yellow("⚠ Token not valid yet. Valid from %s (in %.0f seconds)", nbfTimeFormatted, float64(nbfUnix-now))
-			} else {
-				color.Green("✓ Token valid since %s (%.0f seconds ago)", nbfTimeFormatted, float64(now-nbfUnix))
-			}
-		} else {
-			fmt.Println("Unrecognized notBefore value")
+	}, func(value interface{}) {
+		fmt.Printf("Unrecognized expiration value: %v\n", value)
+	}, func(t time.Time) {
+		expUnix := t.Unix()
+		expTimeFormatted := t.Format(time.RFC3339)
+		if now > expUnix {
+			color.Red("✗ Token expired at %s (%.0f seconds ago)", expTimeFormatted, float64(now-expUnix))
+			return
 		}
-	}
+		color.Green("✓ Token expires at %s (%.0f seconds from now)", expTimeFormatted, float64(expUnix-now))
+	})
 
-	// check for "iat" (issued at) claim
-	if iat, ok := claims["iat"]; ok {
-		if t, ok := tryParseTimestamp(iat); ok {
-			fmt.Printf("Issued at: %s (%.0f seconds ago)\n", t.Format(time.RFC3339), float64(now-t.Unix()))
-		} else {
-			fmt.Println("Unrecognized issuedAt value")
+	handleTimestampClaim(claims, "nbf", nil, func(interface{}) {
+		fmt.Println("Unrecognized notBefore value")
+	}, func(t time.Time) {
+		nbfUnix := t.Unix()
+		nbfTimeFormatted := t.Format(time.RFC3339)
+		if now < nbfUnix {
+			color.Yellow("⚠ Token not valid yet. Valid from %s (in %.0f seconds)", nbfTimeFormatted, float64(nbfUnix-now))
+			return
 		}
-	}
+		color.Green("✓ Token valid since %s (%.0f seconds ago)", nbfTimeFormatted, float64(now-nbfUnix))
+	})
+
+	handleTimestampClaim(claims, "iat", nil, func(interface{}) {
+		fmt.Println("Unrecognized issuedAt value")
+	}, func(t time.Time) {
+		fmt.Printf("Issued at: %s (%.0f seconds ago)\n", t.Format(time.RFC3339), float64(now-t.Unix()))
+	})
 
 	fmt.Println()
+}
+
+func handleTimestampClaim(claims jwt.MapClaims, name string, onMissing func(), onInvalid func(interface{}), onValid func(time.Time)) {
+	value, ok := claims[name]
+	if !ok {
+		if onMissing != nil {
+			onMissing()
+		}
+		return
+	}
+
+	if t, ok := tryParseTimestamp(value); ok {
+		onValid(t)
+		return
+	}
+
+	if onInvalid != nil {
+		onInvalid(value)
+	}
 }
