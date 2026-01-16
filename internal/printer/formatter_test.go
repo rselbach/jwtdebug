@@ -10,7 +10,7 @@ import (
 
 func TestTryParseTimestampEdgeCases(t *testing.T) {
 	tests := map[string]struct {
-		input  interface{}
+		input  any
 		wantOK bool
 	}{
 		"empty string":            {input: "", wantOK: false},
@@ -53,7 +53,7 @@ func TestTryParseTimestampEdgeCases(t *testing.T) {
 
 func TestFormatTimestamp(t *testing.T) {
 	tests := map[string]struct {
-		input  interface{}
+		input  any
 		wantOK bool
 	}{
 		"valid unix timestamp":     {input: float64(1704067200), wantOK: true},
@@ -82,7 +82,7 @@ func TestFormatTimestamp(t *testing.T) {
 
 func TestFormatValue(t *testing.T) {
 	tests := map[string]struct {
-		input interface{}
+		input any
 		want  string
 	}{
 		"nil returns null": {
@@ -90,35 +90,35 @@ func TestFormatValue(t *testing.T) {
 			want:  "null",
 		},
 		"empty array": {
-			input: []interface{}{},
+			input: []any{},
 			want:  "[]",
 		},
 		"small array": {
-			input: []interface{}{"a", "b", "c"},
+			input: []any{"a", "b", "c"},
 			want:  "[a, b, c]",
 		},
 		"array at limit": {
-			input: []interface{}{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+			input: []any{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
 			want:  "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]",
 		},
 		"large array over limit": {
-			input: []interface{}{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
+			input: []any{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
 			want:  "[array with 11 items]",
 		},
 		"very large array": {
-			input: make([]interface{}, 100),
+			input: make([]any, 100),
 			want:  "[array with 100 items]",
 		},
 		"empty object": {
-			input: map[string]interface{}{},
+			input: map[string]any{},
 			want:  "{}",
 		},
 		"nested object": {
-			input: map[string]interface{}{"key": "value"},
+			input: map[string]any{"key": "value"},
 			want:  "{object with 1 keys}",
 		},
 		"object with multiple keys": {
-			input: map[string]interface{}{"a": 1, "b": 2, "c": 3},
+			input: map[string]any{"a": 1, "b": 2, "c": 3},
 			want:  "{object with 3 keys}",
 		},
 		"string value": {
@@ -157,7 +157,7 @@ func TestFormatValue(t *testing.T) {
 
 func TestFormatNestedValue(t *testing.T) {
 	tests := map[string]struct {
-		input interface{}
+		input any
 		want  string
 	}{
 		"string": {
@@ -169,41 +169,41 @@ func TestFormatNestedValue(t *testing.T) {
 			want:  "line1\\nline2",
 		},
 		"empty array": {
-			input: []interface{}{},
+			input: []any{},
 			want:  "[]",
 		},
 		"nested array": {
-			input: []interface{}{[]interface{}{1, 2}, []interface{}{3, 4}},
+			input: []any{[]any{1, 2}, []any{3, 4}},
 			want:  "[[1, 2], [3, 4]]",
 		},
 		"deeply nested array": {
-			input: []interface{}{[]interface{}{[]interface{}{1}}},
+			input: []any{[]any{[]any{1}}},
 			want:  "[[[1]]]",
 		},
 		"empty object": {
-			input: map[string]interface{}{},
+			input: map[string]any{},
 			want:  "{}",
 		},
 		"simple object": {
-			input: map[string]interface{}{"key": "value"},
+			input: map[string]any{"key": "value"},
 			want:  "{key: value}",
 		},
 		"object with multiple keys sorted": {
-			input: map[string]interface{}{"z": 1, "a": 2, "m": 3},
+			input: map[string]any{"z": 1, "a": 2, "m": 3},
 			want:  "{a: 2, m: 3, z: 1}",
 		},
 		"nested object": {
-			input: map[string]interface{}{
-				"outer": map[string]interface{}{
+			input: map[string]any{
+				"outer": map[string]any{
 					"inner": "value",
 				},
 			},
 			want: "{outer: {inner: value}}",
 		},
 		"mixed nested structure": {
-			input: map[string]interface{}{
-				"array": []interface{}{1, 2},
-				"obj":   map[string]interface{}{"k": "v"},
+			input: map[string]any{
+				"array": []any{1, 2},
+				"obj":   map[string]any{"k": "v"},
 			},
 			want: "{array: [1, 2], obj: {k: v}}",
 		},

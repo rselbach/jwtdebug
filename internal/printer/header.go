@@ -19,7 +19,7 @@ func PrintHeader(token *jwt.Token) {
 }
 
 // printPrettyHeader prints the header in a nicely formatted and aligned way
-func printPrettyHeader(header map[string]interface{}) {
+func printPrettyHeader(header map[string]any) {
 	if len(header) == 0 {
 		fmt.Println("  No header information available")
 		return

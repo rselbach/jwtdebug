@@ -23,6 +23,7 @@ func main() {
 func run() int {
 	cli.InitFlags()
 	flag.Parse()
+	cli.CheckExplicitFlags()
 
 	if exitCode, handled := handleHelpVersion(); handled {
 		return exitCode

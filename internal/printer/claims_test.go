@@ -28,7 +28,7 @@ func TestPrintClaims(t *testing.T) {
 			claims: jwt.MapClaims{
 				"user_id": "abc123",
 				"role":    "admin",
-				"scopes":  []interface{}{"read", "write"},
+				"scopes":  []any{"read", "write"},
 			},
 			outputFormat: "pretty",
 		},
@@ -62,7 +62,7 @@ func TestPrintClaims(t *testing.T) {
 		},
 		"nested claims": {
 			claims: jwt.MapClaims{
-				"user": map[string]interface{}{
+				"user": map[string]any{
 					"name":  "John",
 					"email": "john@example.com",
 				},
@@ -135,8 +135,8 @@ func TestPrintPrettyClaims(t *testing.T) {
 		},
 		"with array values": {
 			claims: jwt.MapClaims{
-				"aud":    []interface{}{"aud1", "aud2"},
-				"scopes": []interface{}{"read", "write", "delete"},
+				"aud":    []any{"aud1", "aud2"},
+				"scopes": []any{"read", "write", "delete"},
 			},
 		},
 		"with boolean values": {

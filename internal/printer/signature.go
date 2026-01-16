@@ -13,7 +13,7 @@ import (
 // PrintSignature prints information about the token signature
 func PrintSignature(sigPart string) {
 	sigTitle := color.New(color.FgYellow, color.Bold)
-	sigData := map[string]interface{}{
+	sigData := map[string]any{
 		"raw": sigPart,
 	}
 

@@ -12,17 +12,17 @@ func TestFormatJSON(t *testing.T) {
 	r := require.New(t)
 
 	// test data
-	testData := map[string]interface{}{
+	testData := map[string]any{
 		"key1": "value1",
 		"key2": 42,
-		"key3": []interface{}{"a", "b", "c"},
+		"key3": []any{"a", "b", "c"},
 	}
 
 	// format as JSON
 	result := formatJSON(testData)
 
 	// parse back to ensure it's valid JSON
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	err := json.Unmarshal([]byte(result), &parsed)
 	r.NoError(err, "Failed to parse JSON")
 
@@ -38,7 +38,7 @@ func TestFormatRaw(t *testing.T) {
 	r := require.New(t)
 
 	// test data
-	testData := map[string]interface{}{
+	testData := map[string]any{
 		"key1": "value1",
 		"key2": 42,
 	}
@@ -61,7 +61,7 @@ func TestFormatData(t *testing.T) {
 	r := require.New(t)
 
 	// test data
-	testData := map[string]interface{}{
+	testData := map[string]any{
 		"key1": "value1",
 		"key2": 42,
 	}
@@ -78,10 +78,10 @@ func TestFormatData(t *testing.T) {
 }
 
 // helper function to compare values
-func compareValues(expected, actual interface{}) bool {
+func compareValues(expected, actual any) bool {
 	switch e := expected.(type) {
-	case []interface{}:
-		a, ok := actual.([]interface{})
+	case []any:
+		a, ok := actual.([]any)
 		if !ok || len(e) != len(a) {
 			return false
 		}

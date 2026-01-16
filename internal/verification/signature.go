@@ -13,7 +13,7 @@ import (
 
 var validAlgorithms = []string{"HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA"}
 
-type keyParser func([]byte) (interface{}, error)
+type keyParser func([]byte) (any, error)
 
 var keyParsers = map[string]keyParser{
 	"HS256": parseHMACKey,
@@ -31,19 +31,19 @@ var keyParsers = map[string]keyParser{
 	"EdDSA": parseEdPublicKey,
 }
 
-func parseHMACKey(keyData []byte) (interface{}, error) {
+func parseHMACKey(keyData []byte) (any, error) {
 	return keyData, nil
 }
 
-func parseRSAPublicKey(keyData []byte) (interface{}, error) {
+func parseRSAPublicKey(keyData []byte) (any, error) {
 	return jwt.ParseRSAPublicKeyFromPEM(keyData)
 }
 
-func parseECPublicKey(keyData []byte) (interface{}, error) {
+func parseECPublicKey(keyData []byte) (any, error) {
 	return jwt.ParseECPublicKeyFromPEM(keyData)
 }
 
-func parseEdPublicKey(keyData []byte) (interface{}, error) {
+func parseEdPublicKey(keyData []byte) (any, error) {
 	return jwt.ParseEdPublicKeyFromPEM(keyData)
 }
 
@@ -76,7 +76,7 @@ func VerifyTokenSignature(tokenString string) error {
 	parseOpts := []jwt.ParserOption{jwt.WithValidMethods(validAlgorithms)}
 
 	// parse using the provided key
-	_, err = jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	_, err = jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
 		parser, ok := keyParsers[token.Method.Alg()]
 		if !ok {
 			return nil, fmt.Errorf("unexpected signing method: %s", token.Header["alg"])

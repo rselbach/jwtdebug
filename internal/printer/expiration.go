@@ -23,7 +23,7 @@ func CheckExpiration(token *jwt.Token) {
 
 	handleTimestampClaim(claims, "exp", func() {
 		fmt.Println("No expiration claim found")
-	}, func(value interface{}) {
+	}, func(value any) {
 		fmt.Printf("Unrecognized expiration value: %v\n", value)
 	}, func(t time.Time) {
 		expUnix := t.Unix()
@@ -35,7 +35,7 @@ func CheckExpiration(token *jwt.Token) {
 		color.Green("✓ Token expires at %s (%.0f seconds from now)", expTimeFormatted, float64(expUnix-now))
 	})
 
-	handleTimestampClaim(claims, "nbf", nil, func(interface{}) {
+	handleTimestampClaim(claims, "nbf", nil, func(any) {
 		fmt.Println("Unrecognized notBefore value")
 	}, func(t time.Time) {
 		nbfUnix := t.Unix()
@@ -47,7 +47,7 @@ func CheckExpiration(token *jwt.Token) {
 		color.Green("✓ Token valid since %s (%.0f seconds ago)", nbfTimeFormatted, float64(now-nbfUnix))
 	})
 
-	handleTimestampClaim(claims, "iat", nil, func(interface{}) {
+	handleTimestampClaim(claims, "iat", nil, func(any) {
 		fmt.Println("Unrecognized issuedAt value")
 	}, func(t time.Time) {
 		fmt.Printf("Issued at: %s (%.0f seconds ago)\n", t.Format(time.RFC3339), float64(now-t.Unix()))
@@ -56,7 +56,7 @@ func CheckExpiration(token *jwt.Token) {
 	fmt.Println()
 }
 
-func handleTimestampClaim(claims jwt.MapClaims, name string, onMissing func(), onInvalid func(interface{}), onValid func(time.Time)) {
+func handleTimestampClaim(claims jwt.MapClaims, name string, onMissing func(), onInvalid func(any), onValid func(time.Time)) {
 	value, ok := claims[name]
 	if !ok {
 		if onMissing != nil {

@@ -12,7 +12,7 @@ import (
 )
 
 // formatJSON formats the data as pretty-printed JSON with sanitized strings
-func formatJSON(v interface{}) string {
+func formatJSON(v any) string {
 	sanitized := sanitizeValue(v)
 	data, err := json.MarshalIndent(sanitized, "", "  ")
 	if err != nil {
@@ -22,18 +22,18 @@ func formatJSON(v interface{}) string {
 }
 
 // sanitizeValue recursively sanitizes all string values in a data structure
-func sanitizeValue(v interface{}) interface{} {
+func sanitizeValue(v any) any {
 	switch val := v.(type) {
 	case string:
 		return sanitizeString(val)
-	case map[string]interface{}:
-		result := make(map[string]interface{}, len(val))
+	case map[string]any:
+		result := make(map[string]any, len(val))
 		for k, v := range val {
 			result[sanitizeString(k)] = sanitizeValue(v)
 		}
 		return result
-	case []interface{}:
-		result := make([]interface{}, len(val))
+	case []any:
+		result := make([]any, len(val))
 		for i, item := range val {
 			result[i] = sanitizeValue(item)
 		}
@@ -44,9 +44,9 @@ func sanitizeValue(v interface{}) interface{} {
 }
 
 // formatRaw formats the data as a simple key-value listing
-func formatRaw(v interface{}) string {
+func formatRaw(v any) string {
 	switch val := v.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		var lines []string
 		// sort keys for consistent output
 		var keys []string
@@ -65,11 +65,11 @@ func formatRaw(v interface{}) string {
 }
 
 // formatRawValue formats a value for the raw format
-func formatRawValue(v interface{}) string {
+func formatRawValue(v any) string {
 	switch val := v.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		return fmt.Sprintf("{object with %d keys}", len(val))
-	case []interface{}:
+	case []any:
 		if len(val) == 0 {
 			return "[]"
 		}
@@ -86,7 +86,7 @@ func formatRawValue(v interface{}) string {
 }
 
 // FormatData returns a string representation of data in the specified format
-func FormatData(data interface{}) string {
+func FormatData(data any) string {
 	switch cli.OutputFormat {
 	case "pretty", "json":
 		return formatJSON(data)
@@ -99,7 +99,7 @@ func FormatData(data interface{}) string {
 	}
 }
 
-func printSection(title string, titleColor *color.Color, pretty func(), data interface{}) {
+func printSection(title string, titleColor *color.Color, pretty func(), data any) {
 	fmt.Println(titleColor.SprintFunc()(title))
 	if cli.OutputFormat == "pretty" || cli.OutputFormat == "" {
 		pretty()

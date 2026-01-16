@@ -26,7 +26,7 @@ func PrintClaims(token *jwt.Token) {
 	}, claims)
 }
 
-func formatClaimValue(value interface{}, tryTimestamp bool) string {
+func formatClaimValue(value any, tryTimestamp bool) string {
 	if tryTimestamp {
 		if formattedTime, ok := formatTimestamp(value); ok {
 			return formattedTime

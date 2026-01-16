@@ -34,7 +34,7 @@ var (
 	}
 )
 
-func formatInlineArray(items []interface{}, formatItem func(interface{}) string) string {
+func formatInlineArray(items []any, formatItem func(any) string) string {
 	if len(items) == 0 {
 		return "[]"
 	}
@@ -51,13 +51,13 @@ func formatInlineArray(items []interface{}, formatItem func(interface{}) string)
 }
 
 // formats a value for display within nested structures like arrays and objects
-func formatNestedValue(v interface{}) string {
+func formatNestedValue(v any) string {
 	switch val := v.(type) {
 	case string:
 		return sanitizeString(val)
-	case []interface{}:
+	case []any:
 		return formatInlineArray(val, formatNestedValue)
-	case map[string]interface{}:
+	case map[string]any:
 		if len(val) == 0 {
 			return "{}"
 		}
@@ -85,17 +85,17 @@ func formatNestedValue(v interface{}) string {
 }
 
 // returns a nicely formatted string representation of a value
-func formatValue(v interface{}) string {
+func formatValue(v any) string {
 	if v == nil {
 		return "null"
 	}
 	switch val := v.(type) {
-	case []interface{}:
+	case []any:
 		if len(val) > maxArrayItemsToDisplay {
 			return fmt.Sprintf("[array with %d items]", len(val))
 		}
 		return formatInlineArray(val, formatNestedValue)
-	case map[string]interface{}:
+	case map[string]any:
 		if len(val) == 0 {
 			return "{}"
 		}
@@ -109,7 +109,7 @@ func formatValue(v interface{}) string {
 
 // attempts to parse various timestamp formats and returns
 // the time and whether parsing was successful
-func tryParseTimestamp(v interface{}) (time.Time, bool) {
+func tryParseTimestamp(v any) (time.Time, bool) {
 	var timestamp int64
 
 	// Try to convert to int64 from different numeric types
@@ -168,7 +168,7 @@ func tryParseTimestamp(v interface{}) (time.Time, bool) {
 
 // formats a value as a timestamp if possible.
 // returns the formatted string and whether it was detected as a timestamp
-func formatTimestamp(v interface{}) (string, bool) {
+func formatTimestamp(v any) (string, bool) {
 	timeColor := color.New(color.FgYellow).SprintFunc()
 
 	t, ok := tryParseTimestamp(v)
