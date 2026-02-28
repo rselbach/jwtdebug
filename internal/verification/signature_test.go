@@ -1,6 +1,7 @@
 package verification
 
 import (
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -16,7 +17,16 @@ func TestVerifyTokenSignature(t *testing.T) {
 
 	hmacKeyFile, err := os.CreateTemp("", "hmac_key_*.txt")
 	r.NoError(err)
-	t.Cleanup(func() { _ = os.Remove(hmacKeyFile.Name()) })
+	t.Cleanup(func() {
+		err := os.Remove(hmacKeyFile.Name())
+		if err == nil {
+			return
+		}
+		if errors.Is(err, os.ErrNotExist) {
+			return
+		}
+		t.Errorf("failed to remove temp key file %q: %v", hmacKeyFile.Name(), err)
+	})
 
 	hmacKey := "your-256-bit-secret"
 	_, err = hmacKeyFile.WriteString(hmacKey)
@@ -25,7 +35,13 @@ func TestVerifyTokenSignature(t *testing.T) {
 
 	keyDir, err := os.MkdirTemp("", "jwtdebug-keydir")
 	r.NoError(err)
-	t.Cleanup(func() { _ = os.RemoveAll(keyDir) })
+	t.Cleanup(func() {
+		err := os.RemoveAll(keyDir)
+		if err == nil {
+			return
+		}
+		t.Errorf("failed to remove temp key dir %q: %v", keyDir, err)
+	})
 
 	validToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
 	invalidToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkphbmUgRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"

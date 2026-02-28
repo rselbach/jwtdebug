@@ -9,7 +9,8 @@ import (
 
 // jwtPattern matches a JWT token: three base64url-encoded parts separated by dots.
 // The header and payload always start with "eyJ" (base64 of `{"`).
-var jwtPattern = regexp.MustCompile(`eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+`)
+// Signature may be empty for unsecured JWTs (alg=none).
+var jwtPattern = regexp.MustCompile(`eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*`)
 
 // NormalizeTokenString extracts a JWT token from the input string.
 // By default (smart mode), it finds the first JWT-shaped string in the input,

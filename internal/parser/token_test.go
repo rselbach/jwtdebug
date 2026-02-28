@@ -101,6 +101,10 @@ func TestNormalizeTokenString(t *testing.T) {
 			in:   `{"access_token":"` + validJWT + `"}`,
 			want: validJWT,
 		},
+		"bearer token with empty signature": {
+			in:   "Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIxMjMifQ.",
+			want: "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIxMjMifQ.",
+		},
 		"raw jwt": {
 			in:   validJWT,
 			want: validJWT,

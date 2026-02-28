@@ -50,7 +50,7 @@ func parseEdPublicKey(keyData []byte) (any, error) {
 // VerifyTokenSignature verifies the token signature using the provided key file
 func VerifyTokenSignature(tokenString string) error {
 	if cli.KeyFile == "" {
-		return errors.New("key file not provided (-key flag required)")
+		return errors.New("key file not provided (--key-file / -k required)")
 	}
 
 	stat, err := os.Stat(cli.KeyFile)

@@ -196,6 +196,6 @@ func PrintUnverifiedNotice() {
 	if cli.Quiet {
 		return
 	}
-	notice := color.New(color.FgYellow).Sprintf("Note: claims are unverified. Use -verify -key to validate.")
+	notice := color.New(color.FgYellow).Sprintf("Note: claims are unverified. Use --verify --key-file to validate.")
 	fmt.Fprintln(color.Error, notice)
 }
