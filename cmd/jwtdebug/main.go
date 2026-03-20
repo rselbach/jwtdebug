@@ -21,84 +21,88 @@ func main() {
 }
 
 func run() int {
-	cli.InitFlags()
+	f := &cli.Flags{}
+	ex := &cli.Explicit{}
+
+	cli.InitFlags(f)
 	flag.Parse()
-	cli.CheckExplicitFlags()
 
-	if exitCode, handled := handleHelpVersion(); handled {
+	if err := f.CheckExplicitFlags(ex); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return constants.ExitError
+	}
+
+	if exitCode, handled := handleHelpVersion(f); handled {
 		return exitCode
 	}
 
-	if exitCode, handled := handleCompletion(); handled {
+	if exitCode, handled := handleCompletion(f); handled {
 		return exitCode
 	}
 
-	cfg, exitCode := loadConfig()
+	cfg, exitCode := loadConfig(f, ex)
 	if exitCode != constants.ExitSuccess {
 		return exitCode
 	}
 
-	cli.ApplyNoColor()
+	f.ApplyColorSettings()
 
-	color.NoColor = !cli.OutputColor
+	f.ApplyAllFlag()
 
-	cli.ApplyAllFlag()
-
-	if exitCode, handled := handleSaveConfig(cfg); handled {
+	if exitCode, handled := handleSaveConfig(cfg, f); handled {
 		return exitCode
 	}
 
-	return processInputTokens()
+	return processInputTokens(f)
 }
 
-func handleHelpVersion() (int, bool) {
-	if cli.ShowHelp {
+func handleHelpVersion(f *cli.Flags) (int, bool) {
+	if f.ShowHelp {
 		cli.PrintUsage()
 		return constants.ExitSuccess, true
 	}
 
-	if cli.ShowVersion {
-		printVersion()
+	if f.ShowVersion {
+		printVersion(f)
 		return constants.ExitSuccess, true
 	}
 
 	return constants.ExitSuccess, false
 }
 
-func handleCompletion() (int, bool) {
-	if cli.CompletionShell == "" {
+func handleCompletion(f *cli.Flags) (int, bool) {
+	if f.CompletionShell == "" {
 		return constants.ExitSuccess, false
 	}
 
-	return generateCompletion(cli.CompletionShell), true
+	return generateCompletion(f.CompletionShell), true
 }
 
-func loadConfig() (*config.Config, int) {
-	cfg, err := config.LoadConfig()
+func loadConfig(f *cli.Flags, ex *cli.Explicit) (*config.Config, int) {
+	cfg, err := config.LoadConfig(f.ConfigFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to load config: %v\n", err)
 		return nil, constants.ExitConfigError
 	}
 
-	config.ApplyConfig(cfg)
+	config.ApplyConfig(cfg, f, ex)
 	return cfg, constants.ExitSuccess
 }
 
-func handleSaveConfig(cfg *config.Config) (int, bool) {
-	if !cli.SaveConfig {
+func handleSaveConfig(cfg *config.Config, f *cli.Flags) (int, bool) {
+	if !f.SaveConfig {
 		return constants.ExitSuccess, false
 	}
 
-	config.UpdateFromCLI(cfg)
+	config.UpdateFromCLI(cfg, f)
 
-	savePath := cli.ConfigFile
+	savePath := f.ConfigFile
 	if err := config.SaveConfig(cfg, savePath); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: Failed to save config: %v\n", err)
 		return constants.ExitConfigError, true
 	}
 	color.Green("Configuration saved successfully.")
 
-	// if no token provided, exit after saving config
 	if flag.NArg() == 0 {
 		return constants.ExitSuccess, true
 	}
@@ -106,22 +110,20 @@ func handleSaveConfig(cfg *config.Config) (int, bool) {
 	return constants.ExitSuccess, false
 }
 
-func processInputTokens() int {
+func processInputTokens(f *cli.Flags) int {
 	argCount := flag.NArg()
 
-	// check for explicit stdin marker "-"
 	if argCount == 0 {
-		return processFromStdin(false)
+		return processFromStdin(f, false)
 	}
 
 	if argCount == 1 && flag.Arg(0) == "-" {
-		return processFromStdin(true)
+		return processFromStdin(f, true)
 	}
 
-	// process tokens provided as arguments
 	for _, token := range flag.Args() {
-		token = parser.NormalizeTokenString(token)
-		exitCode := processToken(token)
+		token = parser.NormalizeTokenString(token, f.Strict)
+		exitCode := processToken(token, f)
 		if exitCode != constants.ExitSuccess {
 			return exitCode
 		}
@@ -130,9 +132,9 @@ func processInputTokens() int {
 	return constants.ExitSuccess
 }
 
-func printVersion() {
+func printVersion(f *cli.Flags) {
 	fmt.Printf("jwtdebug version %s\n", cli.Version)
-	if cli.Verbose || cli.Commit != "unknown" {
+	if f.Verbose || cli.Commit != "unknown" {
 		fmt.Printf("  commit:     %s\n", cli.Commit)
 		fmt.Printf("  built:      %s\n", cli.BuildDate)
 	}
@@ -153,8 +155,8 @@ func generateCompletion(shell string) int {
 	return constants.ExitSuccess
 }
 
-func processToken(token string) int {
-	result := parser.ProcessToken(token)
+func processToken(token string, f *cli.Flags) int {
+	result := parser.ProcessToken(token, f)
 	if result.Err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", result.Err)
 		return result.ExitCode
@@ -162,19 +164,16 @@ func processToken(token string) int {
 	return result.ExitCode
 }
 
-func processFromStdin(explicit bool) int {
-	// check if stdin has data
+func processFromStdin(f *cli.Flags, explicit bool) int {
 	stat, err := os.Stdin.Stat()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to stat stdin: %v\n", err)
 		return constants.ExitError
 	}
 
-	// if stdin is a terminal and not explicitly requested, show hint
 	if (stat.Mode() & os.ModeCharDevice) != 0 {
 		if explicit {
-			// explicit "-" argument, wait for input
-			if !cli.Quiet {
+			if !f.Quiet {
 				fmt.Fprintln(os.Stderr, "Reading token from stdin... (press Ctrl+D when done)")
 			}
 		}
@@ -191,17 +190,16 @@ func processFromStdin(explicit bool) int {
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
-	// allow reasonable JWT inputs (up to 1MB to prevent DoS)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	hasToken := false
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		line = parser.NormalizeTokenString(line)
+		line = parser.NormalizeTokenString(line, f.Strict)
 		if line == "" {
 			continue
 		}
 		hasToken = true
-		exitCode := processToken(line)
+		exitCode := processToken(line, f)
 		if exitCode != constants.ExitSuccess {
 			return exitCode
 		}

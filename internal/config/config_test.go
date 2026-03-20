@@ -12,14 +12,12 @@ import (
 func TestLoadSaveConfig(t *testing.T) {
 	r := require.New(t)
 
-	// Create a temporary directory for config file
 	tempDir, err := os.MkdirTemp("", "jwtdebug-test")
 	r.NoError(err)
 	defer os.RemoveAll(tempDir)
 
 	configPath := filepath.Join(tempDir, "config.json")
 
-	// Test config
 	testConfig := &Config{
 		DefaultFormat:    "json",
 		ColorEnabled:     true,
@@ -32,20 +30,12 @@ func TestLoadSaveConfig(t *testing.T) {
 		IgnoreExpiration: false,
 	}
 
-	// Save config
 	err = SaveConfig(testConfig, configPath)
 	r.NoError(err, "Should save config without error")
 
-	// Save original CLI config file
-	originalConfigFile := cli.ConfigFile
-	cli.ConfigFile = configPath
-	t.Cleanup(func() { cli.ConfigFile = originalConfigFile })
-
-	// Load config
-	loadedConfig, err := LoadConfig()
+	loadedConfig, err := LoadConfig(configPath)
 	r.NoError(err, "Should load config without error")
 
-	// Verify config values
 	r.Equal(testConfig.DefaultFormat, loadedConfig.DefaultFormat)
 	r.Equal(testConfig.ColorEnabled, loadedConfig.ColorEnabled)
 	r.Equal(testConfig.DefaultKeyFile, loadedConfig.DefaultKeyFile)
@@ -60,13 +50,7 @@ func TestLoadSaveConfig(t *testing.T) {
 func TestLoadConfigErrors(t *testing.T) {
 	r := require.New(t)
 
-	// Save original CLI config file
-	originalConfigFile := cli.ConfigFile
-	cli.ConfigFile = "/path/to/non-existent-config.json"
-	t.Cleanup(func() { cli.ConfigFile = originalConfigFile })
-
-	// Test loading from non-existent file
-	_, err := LoadConfig()
+	_, err := LoadConfig("/path/to/non-existent-config.json")
 	r.Error(err, "Should return error for non-existent config file")
 }
 
@@ -85,22 +69,11 @@ func TestApplyConfig(t *testing.T) {
 		IgnoreExpiration: false,
 	}
 
-	// Mock some CLI flags
-	cli.FormatExplicit = false
-	cli.ColorExplicit = false
-	cli.KeyFileExplicit = false
-	cli.HeaderExplicit = false
-	cli.ClaimsExplicit = false
-	cli.SignatureExplicit = false
-	cli.ExpirationExplicit = false
-	cli.DecodeBase64Explicit = false
-	cli.IgnoreExpirationExplicit = false
+	f := &cli.Flags{}
+	ex := &cli.Explicit{}
+	ApplyConfig(testConfig, f, ex)
 
-	// Mock existing CLI flags
-	ApplyConfig(testConfig)
-
-	// Add assertions to verify config application
-	r.Equal("json", cli.OutputFormat)
-	r.False(cli.OutputColor)
-	r.Equal("/path/to/key", cli.KeyFile)
+	r.Equal("json", f.OutputFormat)
+	r.False(f.OutputColor)
+	r.Equal("/path/to/key", f.KeyFile)
 }

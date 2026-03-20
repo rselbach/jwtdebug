@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+
+	"github.com/fatih/color"
 )
 
 // Version information will be set at build time
@@ -13,8 +15,8 @@ var (
 	BuildDate = "unknown"
 )
 
-var (
-	// Exported flag variables
+// Flags holds all CLI flag values
+type Flags struct {
 	WithHeader       bool
 	WithClaims       bool
 	WithSignature    bool
@@ -36,18 +38,20 @@ var (
 	ShowHelp         bool
 	CompletionShell  string
 	Strict           bool
+}
 
-	// Track if flags were explicitly set by user
-	HeaderExplicit           bool
-	ClaimsExplicit           bool
-	SignatureExplicit        bool
-	KeyFileExplicit          bool
-	FormatExplicit           bool
-	ColorExplicit            bool
-	ExpirationExplicit       bool
-	DecodeBase64Explicit     bool
-	IgnoreExpirationExplicit bool
-)
+// Explicit tracks which flags were explicitly set by the user
+type Explicit struct {
+	Header           bool
+	Claims           bool
+	Signature        bool
+	KeyFile          bool
+	Format           bool
+	Color            bool
+	Expiration       bool
+	DecodeBase64     bool
+	IgnoreExpiration bool
+}
 
 // ValidFormats defines the allowed output formats
 var ValidFormats = map[string]bool{
@@ -64,110 +68,124 @@ func validateFormat(format string) error {
 	return nil
 }
 
-// InitFlags initializes all command-line flags
-func InitFlags() {
+// InitFlags initializes all command-line flags on the provided Flags struct
+func InitFlags(f *Flags) {
 	// Output selection flags
-	flag.BoolVar(&WithHeader, "header", false, "show token header")
-	flag.BoolVar(&WithHeader, "H", false, "show token header (shorthand)")
+	flag.BoolVar(&f.WithHeader, "header", false, "show token header")
+	flag.BoolVar(&f.WithHeader, "H", false, "show token header (shorthand)")
 
-	flag.BoolVar(&WithClaims, "claims", true, "show token claims (payload)")
-	flag.BoolVar(&WithClaims, "c", true, "show token claims (payload) (shorthand)")
+	flag.BoolVar(&f.WithClaims, "claims", true, "show token claims (payload)")
+	flag.BoolVar(&f.WithClaims, "c", true, "show token claims (payload) (shorthand)")
 
-	flag.BoolVar(&WithSignature, "signature", false, "show token signature")
-	flag.BoolVar(&WithSignature, "s", false, "show token signature (shorthand)")
+	flag.BoolVar(&f.WithSignature, "signature", false, "show token signature")
+	flag.BoolVar(&f.WithSignature, "s", false, "show token signature (shorthand)")
 
-	flag.BoolVar(&ShowAll, "all", false, "show all token parts and info")
-	flag.BoolVar(&ShowAll, "a", false, "show all token parts and info (shorthand)")
+	flag.BoolVar(&f.ShowAll, "all", false, "show all token parts and info")
+	flag.BoolVar(&f.ShowAll, "a", false, "show all token parts and info (shorthand)")
 
 	// Verification flags
-	flag.BoolVar(&VerifySignature, "verify", false, "verify token signature (requires --key-file)")
-	flag.BoolVar(&VerifySignature, "V", false, "verify token signature (shorthand)")
+	flag.BoolVar(&f.VerifySignature, "verify", false, "verify token signature (requires --key-file)")
+	flag.BoolVar(&f.VerifySignature, "V", false, "verify token signature (shorthand)")
 
-	flag.StringVar(&KeyFile, "key-file", "", "key file for signature verification")
-	flag.StringVar(&KeyFile, "k", "", "key file for signature verification (shorthand)")
+	flag.StringVar(&f.KeyFile, "key-file", "", "key file for signature verification")
+	flag.StringVar(&f.KeyFile, "k", "", "key file for signature verification (shorthand)")
 	// Deprecated alias
-	flag.StringVar(&KeyFile, "key", "", "key file (deprecated: use --key-file)")
+	flag.StringVar(&f.KeyFile, "key", "", "key file (deprecated: use --key-file)")
 
-	flag.BoolVar(&IgnoreExpiration, "ignore-expiration", false, "ignore token expiration when verifying")
+	flag.BoolVar(&f.IgnoreExpiration, "ignore-expiration", false, "ignore token expiration when verifying")
 	// Deprecated alias
-	flag.BoolVar(&IgnoreExpiration, "ignore-exp", false, "ignore expiration (deprecated: use --ignore-expiration)")
+	flag.BoolVar(&f.IgnoreExpiration, "ignore-exp", false, "ignore expiration (deprecated: use --ignore-expiration)")
 
 	// Output format flags
-	flag.StringVar(&OutputFormat, "output", "pretty", "output format: pretty, json, or raw")
-	flag.StringVar(&OutputFormat, "o", "pretty", "output format (shorthand)")
+	flag.StringVar(&f.OutputFormat, "output", "pretty", "output format: pretty, json, or raw")
+	flag.StringVar(&f.OutputFormat, "o", "pretty", "output format (shorthand)")
 	// Deprecated alias
-	flag.StringVar(&OutputFormat, "format", "pretty", "output format (deprecated: use --output)")
+	flag.StringVar(&f.OutputFormat, "format", "pretty", "output format (deprecated: use --output)")
 
-	flag.BoolVar(&OutputColor, "color", true, "colorize output")
-	flag.BoolVar(&NoColor, "no-color", false, "disable colored output")
-	flag.BoolVar(&RawClaims, "raw-claims", false, "output only raw claims JSON (for piping)")
+	flag.BoolVar(&f.OutputColor, "color", true, "colorize output")
+	flag.BoolVar(&f.NoColor, "no-color", false, "disable colored output")
+	flag.BoolVar(&f.RawClaims, "raw-claims", false, "output only raw claims JSON (for piping)")
 
 	// Expiration flags
-	flag.BoolVar(&ShowExpiration, "expiration", false, "check token expiration status")
-	flag.BoolVar(&ShowExpiration, "e", false, "check token expiration status (shorthand)")
+	flag.BoolVar(&f.ShowExpiration, "expiration", false, "check token expiration status")
+	flag.BoolVar(&f.ShowExpiration, "e", false, "check token expiration status (shorthand)")
 	// Deprecated alias
-	flag.BoolVar(&ShowExpiration, "expiry", false, "check expiration (deprecated: use --expiration)")
+	flag.BoolVar(&f.ShowExpiration, "expiry", false, "check expiration (deprecated: use --expiration)")
 
-	flag.BoolVar(&DecodeBase64, "decode-signature", false, "decode signature from base64 to hex")
+	flag.BoolVar(&f.DecodeBase64, "decode-signature", false, "decode signature from base64 to hex")
 	// Deprecated alias
-	flag.BoolVar(&DecodeBase64, "decode-sig", false, "decode signature (deprecated: use --decode-signature)")
+	flag.BoolVar(&f.DecodeBase64, "decode-sig", false, "decode signature (deprecated: use --decode-signature)")
 
 	// Config flags
-	flag.StringVar(&ConfigFile, "config", "", "path to config file")
-	flag.BoolVar(&SaveConfig, "save-config", false, "save current settings to config file")
+	flag.StringVar(&f.ConfigFile, "config", "", "path to config file")
+	flag.BoolVar(&f.SaveConfig, "save-config", false, "save current settings to config file")
 
 	// Info flags
-	flag.BoolVar(&ShowVersion, "version", false, "show version information")
-	flag.BoolVar(&ShowHelp, "help", false, "show help message")
-	flag.BoolVar(&ShowHelp, "h", false, "show help message (shorthand)")
+	flag.BoolVar(&f.ShowVersion, "version", false, "show version information")
+	flag.BoolVar(&f.ShowHelp, "help", false, "show help message")
+	flag.BoolVar(&f.ShowHelp, "h", false, "show help message (shorthand)")
 
 	// Verbosity flags
-	flag.BoolVar(&Quiet, "quiet", false, "suppress informational notices")
-	flag.BoolVar(&Quiet, "q", false, "suppress informational notices (shorthand)")
-	flag.BoolVar(&Verbose, "verbose", false, "enable verbose output for debugging")
-	flag.BoolVar(&Verbose, "v", false, "enable verbose output for debugging (shorthand)")
+	flag.BoolVar(&f.Quiet, "quiet", false, "suppress informational notices")
+	flag.BoolVar(&f.Quiet, "q", false, "suppress informational notices (shorthand)")
+	flag.BoolVar(&f.Verbose, "verbose", false, "enable verbose output for debugging")
+	flag.BoolVar(&f.Verbose, "v", false, "enable verbose output for debugging (shorthand)")
 
 	// Shell completion
-	flag.StringVar(&CompletionShell, "completion", "", "generate shell completion script (bash, zsh, fish)")
+	flag.StringVar(&f.CompletionShell, "completion", "", "generate shell completion script (bash, zsh, fish)")
 
 	// Input parsing
-	flag.BoolVar(&Strict, "strict", false, "disable smart token extraction (expect exact JWT input)")
+	flag.BoolVar(&f.Strict, "strict", false, "disable smart token extraction (expect exact JWT input)")
 
 	flag.Usage = PrintUsage
 }
 
-// CheckExplicitFlags checks which flags were explicitly set by the user
-func CheckExplicitFlags() {
-	flag.Visit(func(f *flag.Flag) {
-		switch f.Name {
+// CheckExplicitFlags checks which flags were explicitly set by the user.
+// Returns an error if the format flag was set to an invalid value.
+func (f *Flags) CheckExplicitFlags(ex *Explicit) error {
+	deprecatedFlags := map[string]string{
+		"key":        "--key-file",
+		"ignore-exp": "--ignore-expiration",
+		"format":     "--output",
+		"expiry":     "--expiration",
+		"decode-sig": "--decode-signature",
+	}
+
+	flag.Visit(func(fl *flag.Flag) {
+		if replacement, ok := deprecatedFlags[fl.Name]; ok {
+			fmt.Fprintf(os.Stderr, "Warning: --%s is deprecated, use %s\n", fl.Name, replacement)
+		}
+
+		switch fl.Name {
 		case "header", "H":
-			HeaderExplicit = true
+			ex.Header = true
 		case "claims", "c":
-			ClaimsExplicit = true
+			ex.Claims = true
 		case "signature", "s":
-			SignatureExplicit = true
+			ex.Signature = true
 		case "key-file", "k", "key":
-			KeyFileExplicit = true
+			ex.KeyFile = true
 		case "output", "o", "format":
-			FormatExplicit = true
+			ex.Format = true
 		case "color":
-			ColorExplicit = true
+			ex.Color = true
 		case "expiration", "e", "expiry":
-			ExpirationExplicit = true
+			ex.Expiration = true
 		case "decode-signature", "decode-sig":
-			DecodeBase64Explicit = true
+			ex.DecodeBase64 = true
 		case "ignore-expiration", "ignore-exp":
-			IgnoreExpirationExplicit = true
+			ex.IgnoreExpiration = true
 		}
 	})
 
 	// Validate format if it was set
-	if FormatExplicit {
-		if err := validateFormat(OutputFormat); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+	if ex.Format {
+		if err := validateFormat(f.OutputFormat); err != nil {
+			return err
 		}
 	}
+
+	return nil
 }
 
 // PrintUsage prints the usage information
@@ -235,18 +253,19 @@ For more information, see: https://github.com/rselbach/jwtdebug
 }
 
 // ApplyAllFlag enables all output options if the -all flag is set
-func ApplyAllFlag() {
-	if ShowAll {
-		WithHeader = true
-		WithClaims = true
-		WithSignature = true
-		ShowExpiration = true
+func (f *Flags) ApplyAllFlag() {
+	if f.ShowAll {
+		f.WithHeader = true
+		f.WithClaims = true
+		f.WithSignature = true
+		f.ShowExpiration = true
 	}
 }
 
-// ApplyNoColor sets OutputColor to false if --no-color is specified
-func ApplyNoColor() {
-	if NoColor {
-		OutputColor = false
+// ApplyColorSettings syncs --no-color into OutputColor and the global color.NoColor
+func (f *Flags) ApplyColorSettings() {
+	if f.NoColor {
+		f.OutputColor = false
 	}
+	color.NoColor = !f.OutputColor
 }

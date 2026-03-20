@@ -5,6 +5,17 @@ import (
 	"strings"
 )
 
+// controlCharEscapes is a pre-computed lookup table for ASCII control characters (0x00-0x1F, 0x7F).
+var controlCharEscapes [128]string
+
+func init() {
+	for i := 0; i < 0x20; i++ {
+		controlCharEscapes[i] = fmt.Sprintf("\\x%02X", i)
+	}
+	controlCharEscapes[0x1b] = "\\x1B"
+	controlCharEscapes[0x7f] = "\\x7F"
+}
+
 // sanitizeString removes ANSI escape initiators and control characters
 // from a string, rendering control bytes as visible escape sequences.
 // It preserves printable runes and replaces \n/\r/\t with escaped forms.
@@ -19,7 +30,7 @@ func sanitizeString(s string) string {
 		return s
 	}
 	var b strings.Builder
-	b.Grow(len(s))
+	b.Grow(len(s) * 2)
 	for _, r := range s {
 		switch r {
 		case '\n':
@@ -29,27 +40,25 @@ func sanitizeString(s string) string {
 		case '\t':
 			b.WriteString("\\t")
 		default:
-			// Drop/encode ASCII control chars and DEL
-			if (r >= 0 && r < 0x20) || r == 0x7f {
-				b.WriteString(fmt.Sprintf("\\x%02X", r))
-				continue
-			}
-			// ESC (0x1B) explicitly encoded
-			if r == 0x1b {
-				b.WriteString("\\x1B")
+			if r < 0x20 || r == 0x7f {
+				if r < 0x80 {
+					b.WriteString(controlCharEscapes[r])
+				} else {
+					fmt.Fprintf(&b, "\\u%04X", r)
+				}
 				continue
 			}
 			// Unicode C1 control characters (0x80-0x9F)
 			if r >= 0x80 && r <= 0x9F {
-				b.WriteString(fmt.Sprintf("\\u%04X", r))
+				fmt.Fprintf(&b, "\\u%04X", r)
 				continue
 			}
-			// zero-width chars, bidi overrides, and BOM that could be used for display attacks
-			if (r >= 0x200B && r <= 0x200F) || // zero-width chars
-				(r >= 0x202A && r <= 0x202E) || // bidi overrides
-				(r >= 0x2066 && r <= 0x2069) || // bidi isolates
-				r == 0xFEFF { // BOM/ZWNBSP
-				b.WriteString(fmt.Sprintf("\\u%04X", r))
+			// zero-width chars, bidi overrides, and BOM
+			if (r >= 0x200B && r <= 0x200F) ||
+				(r >= 0x202A && r <= 0x202E) ||
+				(r >= 0x2066 && r <= 0x2069) ||
+				r == 0xFEFF {
+				fmt.Fprintf(&b, "\\u%04X", r)
 				continue
 			}
 			b.WriteRune(r)

@@ -8,7 +8,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/rselbach/jwtdebug/internal/cli"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,7 +27,7 @@ func TestVerifyTokenSignature(t *testing.T) {
 		t.Errorf("failed to remove temp key file %q: %v", hmacKeyFile.Name(), err)
 	})
 
-	hmacKey := "your-256-bit-secret"
+	hmacKey := "your-256-bit-secret-with-enough-bytes!"
 	_, err = hmacKeyFile.WriteString(hmacKey)
 	r.NoError(err)
 	r.NoError(hmacKeyFile.Close())
@@ -43,9 +42,6 @@ func TestVerifyTokenSignature(t *testing.T) {
 		t.Errorf("failed to remove temp key dir %q: %v", keyDir, err)
 	})
 
-	validToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
-	invalidToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkphbmUgRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
-
 	now := time.Now()
 	sign := func(claims jwt.MapClaims) string {
 		tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -53,6 +49,17 @@ func TestVerifyTokenSignature(t *testing.T) {
 		r.NoError(signErr)
 		return signed
 	}
+
+	validClaims := jwt.MapClaims{
+		"sub":  "1234567890",
+		"name": "John Doe",
+		"iat":  now.Add(-time.Hour).Unix(),
+		"exp":  now.Add(time.Hour).Unix(),
+	}
+	validToken := sign(validClaims)
+
+	// Same header+payload but wrong signature
+	invalidToken := sign(validClaims) + "tampered"
 
 	expiredToken := sign(jwt.MapClaims{
 		"sub":  "1234567890",
@@ -67,6 +74,13 @@ func TestVerifyTokenSignature(t *testing.T) {
 		"nbf":  now.Add(time.Hour).Unix(),
 		"exp":  now.Add(2 * time.Hour).Unix(),
 	})
+
+	shortKeyFile, err := os.CreateTemp("", "short_key_*.txt")
+	r.NoError(err)
+	_, err = shortKeyFile.WriteString("short")
+	r.NoError(err)
+	r.NoError(shortKeyFile.Close())
+	t.Cleanup(func() { os.Remove(shortKeyFile.Name()) })
 
 	tests := map[string]struct {
 		token            string
@@ -122,22 +136,19 @@ func TestVerifyTokenSignature(t *testing.T) {
 			ignoreExpiration: true,
 			expectError:      false,
 		},
+		"Short HMAC key rejected": {
+			token:        validToken,
+			keyFile:      shortKeyFile.Name(),
+			expectError:  true,
+			errorMessage: "HMAC key too short",
+		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
 
-			prevKeyFile := cli.KeyFile
-			prevIgnore := cli.IgnoreExpiration
-			cli.KeyFile = tc.keyFile
-			cli.IgnoreExpiration = tc.ignoreExpiration
-			t.Cleanup(func() {
-				cli.KeyFile = prevKeyFile
-				cli.IgnoreExpiration = prevIgnore
-			})
-
-			err := VerifyTokenSignature(tc.token)
+			err := VerifyTokenSignature(tc.token, tc.keyFile, tc.ignoreExpiration)
 
 			if tc.expectError {
 				r.Error(err, "Expected error but got none")

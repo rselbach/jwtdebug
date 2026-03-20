@@ -6,18 +6,16 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-
-	"github.com/rselbach/jwtdebug/internal/cli"
 )
 
 // PrintSignature prints information about the token signature
-func PrintSignature(sigPart string) {
+func PrintSignature(sigPart, outputFormat string, decodeBase64 bool) {
 	sigTitle := color.New(color.FgYellow, color.Bold)
 	sigData := map[string]any{
 		"raw": sigPart,
 	}
 
-	if cli.DecodeBase64 {
+	if decodeBase64 {
 		sigBytes, err := base64.RawURLEncoding.DecodeString(sigPart)
 		if err == nil {
 			sigData["decoded"] = fmt.Sprintf("%x", sigBytes)
@@ -25,21 +23,17 @@ func PrintSignature(sigPart string) {
 	}
 
 	printSection("SIGNATURE:", sigTitle, func() {
-		printPrettySignature(sigPart)
-	}, sigData)
+		printPrettySignature(sigPart, decodeBase64)
+	}, sigData, outputFormat)
 }
 
-func printPrettySignature(sigPart string) {
-	// print raw signature in pretty format with alignment
+func printPrettySignature(sigPart string, decodeBase64 bool) {
 	keyColor := color.New(color.FgCyan).SprintFunc()
-
-	// Calculate padding for alignment
-	labelLength := 12 // "Decoded (hex)" is the longest label
+	labelLength := 12
 
 	fmt.Printf("  %s:%s%s\n", keyColor("Raw"), strings.Repeat(" ", labelLength-3), sigPart)
 
-	// decode and print base64 if requested
-	if cli.DecodeBase64 {
+	if decodeBase64 {
 		sigBytes, err := base64.RawURLEncoding.DecodeString(sigPart)
 		if err != nil {
 			errMsg := fmt.Sprintf("Error decoding: %v", err)

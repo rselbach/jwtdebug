@@ -8,6 +8,25 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// PrintVerificationSuccess prints a success message for signature verification
+func PrintVerificationSuccess() {
+	color.Green("✓ Signature verified successfully")
+}
+
+// PrintVerificationFailure prints a failure message for signature verification
+func PrintVerificationFailure(err error) {
+	color.Red("✗ Signature verification failed: %v", err)
+}
+
+// PrintUnverifiedNotice prints a single-line warning that claims are unverified.
+func PrintUnverifiedNotice(quiet bool) {
+	if quiet {
+		return
+	}
+	notice := color.New(color.FgYellow).Sprintf("Note: claims are unverified. Use --verify --key-file to validate.")
+	fmt.Fprintln(color.Error, notice)
+}
+
 // CheckExpiration checks and displays token expiration status
 func CheckExpiration(token *jwt.Token) {
 	expTitle := color.New(color.FgCyan, color.Bold).SprintFunc()

@@ -4,8 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/rselbach/jwtdebug/internal/cli"
 )
 
 func TestPrintSignature(t *testing.T) {
@@ -75,11 +73,8 @@ func TestPrintSignature(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
 
-			cli.OutputFormat = tc.outputFormat
-			cli.DecodeBase64 = tc.decodeBase64
-
 			r.NotPanics(func() {
-				PrintSignature(tc.sigPart)
+				PrintSignature(tc.sigPart, tc.outputFormat, tc.decodeBase64)
 			})
 		})
 	}
@@ -108,11 +103,8 @@ func TestPrintSignatureInvalidBase64(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
 
-			cli.OutputFormat = tc.outputFormat
-			cli.DecodeBase64 = true
-
 			r.NotPanics(func() {
-				PrintSignature(tc.sigPart)
+				PrintSignature(tc.sigPart, tc.outputFormat, true)
 			})
 		})
 	}
@@ -155,11 +147,8 @@ func TestPrintSignatureFormats(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
 
-			cli.OutputFormat = tc.outputFormat
-			cli.DecodeBase64 = tc.decodeBase64
-
 			r.NotPanics(func() {
-				PrintSignature(validSignature)
+				PrintSignature(validSignature, tc.outputFormat, tc.decodeBase64)
 			})
 		})
 	}

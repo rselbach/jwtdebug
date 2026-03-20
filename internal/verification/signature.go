@@ -7,7 +7,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/rselbach/jwtdebug/internal/cli"
 	"github.com/rselbach/jwtdebug/internal/constants"
 )
 
@@ -31,7 +30,12 @@ var keyParsers = map[string]keyParser{
 	"EdDSA": parseEdPublicKey,
 }
 
+const minHMACKeyLen = 32
+
 func parseHMACKey(keyData []byte) (any, error) {
+	if len(keyData) < minHMACKeyLen {
+		return nil, fmt.Errorf("HMAC key too short: %d bytes (minimum %d)", len(keyData), minHMACKeyLen)
+	}
 	return keyData, nil
 }
 
@@ -48,12 +52,12 @@ func parseEdPublicKey(keyData []byte) (any, error) {
 }
 
 // VerifyTokenSignature verifies the token signature using the provided key file
-func VerifyTokenSignature(tokenString string) error {
-	if cli.KeyFile == "" {
+func VerifyTokenSignature(tokenString, keyFile string, ignoreExpiration bool) error {
+	if keyFile == "" {
 		return errors.New("key file not provided (--key-file / -k required)")
 	}
 
-	stat, err := os.Stat(cli.KeyFile)
+	stat, err := os.Stat(keyFile)
 	if err != nil {
 		return fmt.Errorf("failed to stat key file: %w", err)
 	}
@@ -61,21 +65,17 @@ func VerifyTokenSignature(tokenString string) error {
 		return errors.New("key file must be a regular file")
 	}
 
-	// limit key file size to prevent DoS
 	if stat.Size() > constants.MaxFileSizeBytes {
 		return fmt.Errorf("key file too large (max %d bytes)", constants.MaxFileSizeBytes)
 	}
 
-	// read key file
-	keyData, err := os.ReadFile(cli.KeyFile)
+	keyData, err := os.ReadFile(keyFile)
 	if err != nil {
 		return fmt.Errorf("failed to read key file: %w", err)
 	}
 
-	// parse the token with verification
 	parseOpts := []jwt.ParserOption{jwt.WithValidMethods(validAlgorithms)}
 
-	// parse using the provided key
 	_, err = jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
 		parser, ok := keyParsers[token.Method.Alg()]
 		if !ok {
@@ -84,15 +84,13 @@ func VerifyTokenSignature(tokenString string) error {
 		return parser(keyData)
 	}, parseOpts...)
 
-	if err != nil && cli.IgnoreExpiration && onlyTimeValidationErrors(err) {
+	if err != nil && ignoreExpiration && onlyTimeValidationErrors(err) {
 		return nil
 	}
 
 	return err
 }
 
-// onlyTimeValidationErrors reports whether the provided error (and any wrapped errors)
-// consists exclusively of time-related validation failures (expired or not yet valid).
 func onlyTimeValidationErrors(err error) bool {
 	if err == nil {
 		return false
@@ -100,15 +98,12 @@ func onlyTimeValidationErrors(err error) bool {
 
 	hasTimeError := false
 
-	// walk returns true if e (and all wrapped errors) are acceptable
-	// (either time-related errors or allowed wrappers like ErrTokenInvalidClaims)
 	var walk func(error) bool
 	walk = func(e error) bool {
 		if e == nil {
 			return true
 		}
 
-		// check if this is directly a time-related sentinel
 		if errors.Is(e, jwt.ErrTokenExpired) || errors.Is(e, jwt.ErrTokenNotValidYet) {
 			hasTimeError = true
 			return true
@@ -117,7 +112,6 @@ func onlyTimeValidationErrors(err error) bool {
 			return true
 		}
 
-		// for any other error, we must unwrap and check children
 		if multi, ok := e.(interface{ Unwrap() []error }); ok {
 			for _, inner := range multi.Unwrap() {
 				if !walk(inner) {
@@ -130,11 +124,9 @@ func onlyTimeValidationErrors(err error) bool {
 			if inner := single.Unwrap(); inner != nil {
 				return walk(inner)
 			}
-			// wraps nil - this is a leaf that's not time-related
 			return false
 		}
 
-		// leaf error that's not time-related
 		return false
 	}
 

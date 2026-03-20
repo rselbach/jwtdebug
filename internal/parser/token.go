@@ -20,8 +20,7 @@ type Result struct {
 }
 
 // ProcessToken parses and displays information about a JWT token
-func ProcessToken(tokenString string) Result {
-	// split the token into parts for analysis
+func ProcessToken(tokenString string, f *cli.Flags) Result {
 	parts := strings.Split(tokenString, ".")
 	if len(parts) != 3 {
 		snippet := tokenSnippet(tokenString)
@@ -31,7 +30,6 @@ func ProcessToken(tokenString string) Result {
 		}
 	}
 
-	// parse without verification first using ParseUnverified
 	token, _, err := jwt.NewParser().ParseUnverified(tokenString, jwt.MapClaims{})
 	if err != nil {
 		snippet := tokenSnippet(tokenString)
@@ -41,43 +39,36 @@ func ProcessToken(tokenString string) Result {
 		}
 	}
 
-	// handle --raw-claims mode: output only the claims JSON and exit
-	if cli.RawClaims {
+	if f.RawClaims {
 		return outputRawClaims(token)
 	}
 
-	// show an unverified notice when not verifying (stderr; does not break JSON)
-	if !cli.VerifySignature {
-		printer.PrintUnverifiedNotice()
+	if !f.VerifySignature {
+		printer.PrintUnverifiedNotice(f.Quiet)
 	}
 
-	// print token header
-	if cli.WithHeader {
-		printer.PrintHeader(token)
+	if f.WithHeader {
+		printer.PrintHeader(token, f.OutputFormat)
 	}
 
-	// print token claims
-	if cli.WithClaims {
-		printer.PrintClaims(token)
+	if f.WithClaims {
+		printer.PrintClaims(token, f.OutputFormat)
 	}
 
-	// print signature info
-	if cli.WithSignature {
-		printer.PrintSignature(parts[2])
+	if f.WithSignature {
+		printer.PrintSignature(parts[2], f.OutputFormat, f.DecodeBase64)
 	}
 
-	// check expiration
-	if cli.ShowExpiration {
+	if f.ShowExpiration {
 		printer.CheckExpiration(token)
 	}
 
-	// verify signature if requested
-	if cli.VerifySignature {
-		if err := verification.VerifyTokenSignature(tokenString); err != nil {
+	if f.VerifySignature {
+		if err := verification.VerifyTokenSignature(tokenString, f.KeyFile, f.IgnoreExpiration); err != nil {
 			printer.PrintVerificationFailure(err)
 			return Result{
 				ExitCode: constants.ExitVerificationFail,
-				Err:      nil, // error already printed
+				Err:      nil,
 			}
 		}
 		printer.PrintVerificationSuccess()
@@ -86,7 +77,6 @@ func ProcessToken(tokenString string) Result {
 	return Result{ExitCode: constants.ExitSuccess}
 }
 
-// outputRawClaims outputs only the raw claims as JSON (for piping to jq, etc.)
 func outputRawClaims(token *jwt.Token) Result {
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
@@ -108,7 +98,6 @@ func outputRawClaims(token *jwt.Token) Result {
 	return Result{ExitCode: constants.ExitSuccess}
 }
 
-// tokenSnippet returns a short snippet of the token for error messages
 func tokenSnippet(token string) string {
 	if len(token) <= 20 {
 		return token

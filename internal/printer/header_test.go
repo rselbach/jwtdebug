@@ -5,8 +5,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/require"
-
-	"github.com/rselbach/jwtdebug/internal/cli"
 )
 
 func TestPrintHeader(t *testing.T) {
@@ -75,14 +73,12 @@ func TestPrintHeader(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
 
-			cli.OutputFormat = tc.outputFormat
-
 			token := &jwt.Token{
 				Header: tc.header,
 			}
 
 			r.NotPanics(func() {
-				PrintHeader(token)
+				PrintHeader(token, tc.outputFormat)
 			})
 		})
 	}

@@ -3,8 +3,16 @@ package parser
 import (
 	"testing"
 
+	"github.com/rselbach/jwtdebug/internal/cli"
 	"github.com/stretchr/testify/require"
 )
+
+func defaultFlags() *cli.Flags {
+	return &cli.Flags{
+		WithClaims:   true,
+		OutputFormat: "pretty",
+	}
+}
 
 func TestProcessToken(t *testing.T) {
 	tests := map[string]struct {
@@ -13,7 +21,6 @@ func TestProcessToken(t *testing.T) {
 		errorMessage string
 	}{
 		"Valid Token": {
-			// Use a base64url-encoded signature so parsing works without verification
 			token:      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.c2lnbmF0dXJl",
 			shouldFail: false,
 		},
@@ -32,7 +39,7 @@ func TestProcessToken(t *testing.T) {
 			shouldFail: true,
 		},
 		"Malformed base64 in payload": {
-			token:      "eyJhbGciOiJIUzI1NiJ9.!!!invalid-base64!!!.signature",
+			token:      "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.!!!invalid-base64!!!.signature",
 			shouldFail: true,
 		},
 		"Token with unusual but valid claims": {
@@ -44,14 +51,14 @@ func TestProcessToken(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
-			result := ProcessToken(tc.token)
+			f := defaultFlags()
+			result := ProcessToken(tc.token, f)
 
 			if tc.token == "" {
 				r.NotNil(result.Err, "Expected an error for empty token")
 				return
 			}
 
-			// Simulate token parsing
 			if tc.shouldFail {
 				r.NotNil(result.Err, "Expected an error for token: %s", tc.token)
 			} else {
@@ -62,12 +69,12 @@ func TestProcessToken(t *testing.T) {
 }
 
 func TestNormalizeTokenString(t *testing.T) {
-	// Sample JWT-like tokens (valid base64url format)
 	validJWT := "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NSJ9.signature123"
 
 	tests := map[string]struct {
-		in   string
-		want string
+		in     string
+		strict bool
+		want   string
 	}{
 		"bearer prefix": {
 			in:   "Bearer " + validJWT,
@@ -125,12 +132,22 @@ func TestNormalizeTokenString(t *testing.T) {
 			in:   "",
 			want: "",
 		},
+		"strict mode returns trimmed": {
+			in:     "  " + validJWT + "  ",
+			strict: true,
+			want:   validJWT,
+		},
+		"strict mode does not extract bearer": {
+			in:     "Bearer " + validJWT,
+			strict: true,
+			want:   "Bearer " + validJWT,
+		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
-			got := NormalizeTokenString(tc.in)
+			got := NormalizeTokenString(tc.in, tc.strict)
 			r.Equal(tc.want, got)
 		})
 	}

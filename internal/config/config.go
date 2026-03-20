@@ -47,19 +47,16 @@ func defaultConfigPaths() []string {
 
 	// Configuration file paths in order of precedence
 	return []string{
-		// Removed current directory lookup to avoid untrusted config precedence
-		filepath.Join(home, ".jwtdebug.json"),                     // user's home directory
-		filepath.Join(home, ".config", "jwtdebug.json"),           // XDG config directory
-		filepath.Join(home, ".config", "jwtdebug", "config.json"), // XDG config directory
+		filepath.Join(home, ".jwtdebug.json"),
+		filepath.Join(home, ".config", "jwtdebug.json"),
+		filepath.Join(home, ".config", "jwtdebug", "config.json"),
 	}
 }
 
 // LoadConfig loads configuration from a file
-func LoadConfig() (*Config, error) {
-	// Default configuration
+func LoadConfig(configFile string) (*Config, error) {
 	config := DefaultConfig()
 
-	// Look for config file in default locations
 	var configPath string
 	for _, path := range defaultConfigPaths() {
 		if _, err := os.Stat(path); err == nil {
@@ -68,17 +65,14 @@ func LoadConfig() (*Config, error) {
 		}
 	}
 
-	// If explicit config path provided via CLI
-	if cli.ConfigFile != "" {
-		configPath = cli.ConfigFile
+	if configFile != "" {
+		configPath = configFile
 	}
 
-	// If no config file found or provided
 	if configPath == "" {
 		return config, nil
 	}
 
-	// check file size to prevent DoS
 	stat, err := os.Stat(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat config file: %w", err)
@@ -87,7 +81,6 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("config file too large (max %d bytes)", constants.MaxFileSizeBytes)
 	}
 
-	// Read and parse config file
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
@@ -97,7 +90,6 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
-	// validate format if specified
 	if config.DefaultFormat != "" && !cli.ValidFormats[config.DefaultFormat] {
 		return nil, fmt.Errorf("invalid format %q in config, must be one of: pretty, json, raw", config.DefaultFormat)
 	}
@@ -106,52 +98,54 @@ func LoadConfig() (*Config, error) {
 }
 
 // ApplyConfig applies the configuration to CLI flags if they weren't explicitly set
-func ApplyConfig(config *Config) {
-	if !cli.FormatExplicit {
-		cli.OutputFormat = config.DefaultFormat
+func ApplyConfig(config *Config, f *cli.Flags, ex *cli.Explicit) {
+	if !ex.Format {
+		f.OutputFormat = config.DefaultFormat
 	}
-	if !cli.ColorExplicit {
-		cli.OutputColor = config.ColorEnabled
+	if !ex.Color {
+		f.OutputColor = config.ColorEnabled
 	}
-	if !cli.KeyFileExplicit && cli.KeyFile == "" {
-		cli.KeyFile = config.DefaultKeyFile
+	if !ex.KeyFile && f.KeyFile == "" {
+		f.KeyFile = config.DefaultKeyFile
 	}
-	if !cli.HeaderExplicit {
-		cli.WithHeader = config.ShowHeader
+	if !ex.Header {
+		f.WithHeader = config.ShowHeader
 	}
-	if !cli.ClaimsExplicit {
-		cli.WithClaims = config.ShowClaims
+	if !ex.Claims {
+		f.WithClaims = config.ShowClaims
 	}
-	if !cli.SignatureExplicit {
-		cli.WithSignature = config.ShowSignature
+	if !ex.Signature {
+		f.WithSignature = config.ShowSignature
 	}
-	if !cli.ExpirationExplicit {
-		cli.ShowExpiration = config.ShowExpiration
+	if !ex.Expiration {
+		f.ShowExpiration = config.ShowExpiration
 	}
-	if !cli.DecodeBase64Explicit {
-		cli.DecodeBase64 = config.DecodeSignature
+	if !ex.DecodeBase64 {
+		f.DecodeBase64 = config.DecodeSignature
 	}
-	if !cli.IgnoreExpirationExplicit {
-		cli.IgnoreExpiration = config.IgnoreExpiration
+	if !ex.IgnoreExpiration {
+		if config.IgnoreExpiration {
+			fmt.Fprintln(os.Stderr, "Warning: ignoring token expiration (from config). Use --ignore-expiration to confirm.")
+		}
+		f.IgnoreExpiration = config.IgnoreExpiration
 	}
 }
 
 // UpdateFromCLI updates the config with CLI values.
-func UpdateFromCLI(config *Config) {
-	config.DefaultFormat = cli.OutputFormat
-	config.ColorEnabled = cli.OutputColor
-	config.DefaultKeyFile = cli.KeyFile
-	config.ShowHeader = cli.WithHeader
-	config.ShowClaims = cli.WithClaims
-	config.ShowSignature = cli.WithSignature
-	config.ShowExpiration = cli.ShowExpiration
-	config.DecodeSignature = cli.DecodeBase64
-	config.IgnoreExpiration = cli.IgnoreExpiration
+func UpdateFromCLI(config *Config, f *cli.Flags) {
+	config.DefaultFormat = f.OutputFormat
+	config.ColorEnabled = f.OutputColor
+	config.DefaultKeyFile = f.KeyFile
+	config.ShowHeader = f.WithHeader
+	config.ShowClaims = f.WithClaims
+	config.ShowSignature = f.WithSignature
+	config.ShowExpiration = f.ShowExpiration
+	config.DecodeSignature = f.DecodeBase64
+	config.IgnoreExpiration = f.IgnoreExpiration
 }
 
 // SaveConfig saves the current configuration to a file
 func SaveConfig(config *Config, path string) error {
-	// If no path specified, use default
 	if path == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -160,13 +154,11 @@ func SaveConfig(config *Config, path string) error {
 		path = filepath.Join(home, ".jwtdebug.json")
 	}
 
-	// Serialize config
 	data, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to serialize config: %w", err)
 	}
 
-	// Write to file
 	if err := os.WriteFile(path, data, 0600); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}

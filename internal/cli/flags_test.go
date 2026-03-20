@@ -7,31 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func resetFlags() {
+func resetFlags() *Flags {
 	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
-	WithHeader = false
-	WithClaims = false
-	WithSignature = false
-	VerifySignature = false
-	KeyFile = ""
-	OutputFormat = ""
-	OutputColor = false
-	ShowExpiration = false
-	ShowAll = false
-	DecodeBase64 = false
-	IgnoreExpiration = false
-	ConfigFile = ""
-	SaveConfig = false
-	ShowVersion = false
-	HeaderExplicit = false
-	ClaimsExplicit = false
-	SignatureExplicit = false
-	KeyFileExplicit = false
-	FormatExplicit = false
-	ColorExplicit = false
-	ExpirationExplicit = false
-	DecodeBase64Explicit = false
-	IgnoreExpirationExplicit = false
+	return &Flags{}
 }
 
 func TestValidateFormat(t *testing.T) {
@@ -63,60 +41,75 @@ func TestValidateFormat(t *testing.T) {
 
 func TestInitFlags(t *testing.T) {
 	r := require.New(t)
-	resetFlags()
-	InitFlags()
+	f := resetFlags()
+	InitFlags(f)
 
 	// Use -format (deprecated alias) to verify it still works and sets explicit flag
 	err := flag.CommandLine.Parse([]string{"-header", "-format", "json", "-all"})
 	r.NoError(err)
 
-	// Must call this manually as main does
-	CheckExplicitFlags()
+	ex := &Explicit{}
+	r.NoError(f.CheckExplicitFlags(ex))
 
-	r.True(WithHeader)
-	r.True(HeaderExplicit)
-	r.Equal("json", OutputFormat)
-	r.True(FormatExplicit)
-	r.True(ShowAll)
+	r.True(f.WithHeader)
+	r.True(ex.Header)
+	r.Equal("json", f.OutputFormat)
+	r.True(ex.Format)
+	r.True(f.ShowAll)
 }
 
-func TestEnableAllOutputs(t *testing.T) {
-	r := require.New(t)
-
+func TestApplyAllFlag(t *testing.T) {
 	t.Run("all flag enables everything", func(t *testing.T) {
-		resetFlags()
-		ShowAll = true
-		ApplyAllFlag()
+		r := require.New(t)
+		f := resetFlags()
+		f.ShowAll = true
+		f.ApplyAllFlag()
 
-		r.True(WithHeader)
-		r.True(WithClaims)
-		r.True(WithSignature)
-		r.True(ShowExpiration)
+		r.True(f.WithHeader)
+		r.True(f.WithClaims)
+		r.True(f.WithSignature)
+		r.True(f.ShowExpiration)
 	})
 
 	t.Run("without all flag nothing changes", func(t *testing.T) {
-		resetFlags()
-		ShowAll = false
-		ApplyAllFlag()
+		r := require.New(t)
+		f := resetFlags()
+		f.ShowAll = false
+		f.ApplyAllFlag()
 
-		r.False(WithHeader)
-		r.False(WithClaims)
-		r.False(WithSignature)
-		r.False(ShowExpiration)
+		r.False(f.WithHeader)
+		r.False(f.WithClaims)
+		r.False(f.WithSignature)
+		r.False(f.ShowExpiration)
 	})
 }
 
 func TestFlagPrecedence(t *testing.T) {
 	r := require.New(t)
-	resetFlags()
-	InitFlags()
+	f := resetFlags()
+	InitFlags(f)
 
 	err := flag.CommandLine.Parse([]string{"-claims=false"})
 	r.NoError(err)
 
-	// Must call this manually as main does
-	CheckExplicitFlags()
+	ex := &Explicit{}
+	r.NoError(f.CheckExplicitFlags(ex))
 
-	r.False(WithClaims)
-	r.True(ClaimsExplicit, "explicit flag should track user override")
+	r.False(f.WithClaims)
+	r.True(ex.Claims, "explicit flag should track user override")
+}
+
+func TestDeprecatedFlagWarnings(t *testing.T) {
+	r := require.New(t)
+	f := resetFlags()
+	InitFlags(f)
+
+	err := flag.CommandLine.Parse([]string{"-key", "somefile"})
+	r.NoError(err)
+
+	ex := &Explicit{}
+	r.NoError(f.CheckExplicitFlags(ex))
+
+	r.True(ex.KeyFile)
+	r.Equal("somefile", f.KeyFile)
 }

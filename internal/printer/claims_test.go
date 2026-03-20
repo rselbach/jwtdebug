@@ -5,8 +5,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/require"
-
-	"github.com/rselbach/jwtdebug/internal/cli"
 )
 
 func TestPrintClaims(t *testing.T) {
@@ -87,16 +85,12 @@ func TestPrintClaims(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
 
-			// Reset cli flags
-			cli.OutputFormat = tc.outputFormat
-
 			token := &jwt.Token{
 				Claims: tc.claims,
 			}
 
-			// Test that PrintClaims doesn't panic
 			r.NotPanics(func() {
-				PrintClaims(token)
+				PrintClaims(token, tc.outputFormat)
 			})
 		})
 	}
@@ -105,9 +99,6 @@ func TestPrintClaims(t *testing.T) {
 func TestPrintClaimsWithInvalidClaims(t *testing.T) {
 	r := require.New(t)
 
-	cli.OutputFormat = "pretty"
-
-	// Create a token with non-MapClaims type
 	token := &jwt.Token{
 		Claims: jwt.RegisteredClaims{
 			Issuer:  "test",
@@ -115,9 +106,8 @@ func TestPrintClaimsWithInvalidClaims(t *testing.T) {
 		},
 	}
 
-	// Should not panic, just print error message
 	r.NotPanics(func() {
-		PrintClaims(token)
+		PrintClaims(token, "pretty")
 	})
 }
 

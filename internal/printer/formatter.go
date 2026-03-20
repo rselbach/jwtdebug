@@ -9,12 +9,9 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/rselbach/jwtdebug/internal/cli"
 )
 
 const (
-	// maxArrayItemsToDisplay is the maximum number of array items to display inline
-	// before showing a summary instead
 	maxArrayItemsToDisplay = 10
 )
 
@@ -50,7 +47,6 @@ func formatInlineArray(items []any, formatItem func(any) string) string {
 	return b.String()
 }
 
-// formats a value for display within nested structures like arrays and objects
 func formatNestedValue(v any) string {
 	switch val := v.(type) {
 	case string:
@@ -84,7 +80,6 @@ func formatNestedValue(v any) string {
 	}
 }
 
-// returns a nicely formatted string representation of a value
 func formatValue(v any) string {
 	if v == nil {
 		return "null"
@@ -107,15 +102,11 @@ func formatValue(v any) string {
 	}
 }
 
-// attempts to parse various timestamp formats and returns
-// the time and whether parsing was successful
 func tryParseTimestamp(v any) (time.Time, bool) {
 	var timestamp int64
 
-	// Try to convert to int64 from different numeric types
 	switch val := v.(type) {
 	case float64:
-		// check for overflow before conversion
 		if val > float64(1<<63-1) || val < float64(-1<<63) {
 			return time.Time{}, false
 		}
@@ -131,14 +122,11 @@ func tryParseTimestamp(v any) (time.Time, bool) {
 	case int:
 		timestamp = int64(val)
 	case string:
-		// Try to parse string directly as a timestamp - if it fails, it's not a time
-		// Try RFC3339 format first
 		t, err := time.Parse(time.RFC3339, val)
 		if err == nil {
 			return t, true
 		}
 
-		// Try common variations
 		for _, format := range timestampFormats {
 			t, err := time.Parse(format, val)
 			if err == nil {
@@ -146,8 +134,6 @@ func tryParseTimestamp(v any) (time.Time, bool) {
 			}
 		}
 
-		// If all string parsing failed, try to convert to a number
-		// as it might be a numeric timestamp in string form
 		numVal, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
 			return time.Time{}, false
@@ -157,8 +143,6 @@ func tryParseTimestamp(v any) (time.Time, bool) {
 		return time.Time{}, false
 	}
 
-	// Check if the timestamp is in a reasonable range
-	// (between 2000-01-01 and 2100-01-01)
 	if timestamp < minTimestamp || timestamp > maxTimestamp {
 		return time.Time{}, false
 	}
@@ -166,8 +150,6 @@ func tryParseTimestamp(v any) (time.Time, bool) {
 	return time.Unix(timestamp, 0), true
 }
 
-// formats a value as a timestamp if possible.
-// returns the formatted string and whether it was detected as a timestamp
 func formatTimestamp(v any) (string, bool) {
 	timeColor := color.New(color.FgYellow).SprintFunc()
 
@@ -176,26 +158,5 @@ func formatTimestamp(v any) (string, bool) {
 		return "", false
 	}
 
-	// Format as both the original value and the time string
 	return fmt.Sprintf("%v %s", v, timeColor(t.Format(time.RFC3339))), true
-}
-
-// PrintVerificationSuccess prints a success message for signature verification
-func PrintVerificationSuccess() {
-	color.Green("✓ Signature verified successfully")
-}
-
-// PrintVerificationFailure prints a failure message for signature verification
-func PrintVerificationFailure(err error) {
-	color.Red("✗ Signature verification failed: %v", err)
-}
-
-// PrintUnverifiedNotice prints a single-line warning that claims are unverified.
-// Printed to stderr to avoid breaking machine-readable stdout formats.
-func PrintUnverifiedNotice() {
-	if cli.Quiet {
-		return
-	}
-	notice := color.New(color.FgYellow).Sprintf("Note: claims are unverified. Use --verify --key-file to validate.")
-	fmt.Fprintln(color.Error, notice)
 }
