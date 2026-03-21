@@ -23,6 +23,14 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Install appimagetool
+        run: |
+          sudo apt-get update && sudo apt-get install -y libfuse2
+          curl -L -o /tmp/appimagetool \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x /tmp/appimagetool
+          sudo mv /tmp/appimagetool /usr/local/bin/appimagetool
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:

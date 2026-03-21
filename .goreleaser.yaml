@@ -1,10 +1,4 @@
-# This is an example .goreleaser.yml file with some sensible defaults.
-# Make sure to check the documentation at https://goreleaser.com
-
-# The lines below are called `modelines`. See `:help modeline`
-# Feel free to remove those if you don't want/need to use them.
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
-# vim: set ts=2 sw=2 tw=0 fo=cnqoj
 
 version: 2
 
@@ -13,7 +7,8 @@ before:
     - go mod tidy
 
 builds:
-  - main: ./cmd/jwtdebug
+  - id: linux
+    main: ./cmd/jwtdebug
     binary: jwtdebug
     ldflags:
       - -X github.com/rselbach/jwtdebug/internal/cli.Version={{ .Version }}
@@ -25,6 +20,25 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
+    goarch:
+      - amd64
+      - arm64
+    hooks:
+      post:
+        - cmd: ./scripts/build-appimage.sh "{{ .Path }}" "{{ .ProjectName }}" "{{ .Version }}"
+
+  - id: default
+    main: ./cmd/jwtdebug
+    binary: jwtdebug
+    ldflags:
+      - -X github.com/rselbach/jwtdebug/internal/cli.Version={{ .Version }}
+      - -X github.com/rselbach/jwtdebug/internal/cli.Commit={{ .ShortCommit }}
+      - -X github.com/rselbach/jwtdebug/internal/cli.BuildDate={{ .Date }}
+      - -s
+      - -w
+    env:
+      - CGO_ENABLED=0
+    goos:
       - darwin
       - windows
 
@@ -37,15 +51,17 @@ brews:
       owner: rselbach
       name: homebrew-tap
       branch: main
-      # Token for Homebrew tap repository
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     download_strategy: CurlDownloadStrategy
     test: |
       system "#{bin}/jwtdebug --version"
 
 archives:
-  - formats: [tar.gz]
-    # this name template makes the OS and Arch compatible with the results of `uname`.
+  - id: default
+    ids:
+      - linux
+      - default
+    formats: [tar.gz]
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
@@ -53,10 +69,28 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
-    # use zip for windows archives
     format_overrides:
       - goos: windows
         formats: [zip]
+
+nfpms:
+  - id: jwtdebug
+    package_name: jwtdebug
+    homepage: https://github.com/rselbach/jwtdebug
+    maintainer: Roberto Selbach <r@selbach.dev>
+    license: MIT
+    description: >-
+      A command line tool to decode, verify and generate JWTs (JSON Web Tokens).
+    formats:
+      - deb
+      - rpm
+      - archlinux
+    bindir: /usr/bin
+    contents:
+      - src: docs/jwtdebug.1
+        dst: /usr/share/man/man1/jwtdebug.1
+        file_info:
+          mode: 0644
 
 changelog:
   sort: asc
