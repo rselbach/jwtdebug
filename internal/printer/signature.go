@@ -15,32 +15,35 @@ func PrintSignature(sigPart, outputFormat string, decodeBase64 bool) {
 		"raw": sigPart,
 	}
 
+	var decodedHex string
+	var decodeErr error
 	if decodeBase64 {
 		sigBytes, err := base64.RawURLEncoding.DecodeString(sigPart)
 		if err == nil {
-			sigData["decoded"] = fmt.Sprintf("%x", sigBytes)
+			decodedHex = fmt.Sprintf("%x", sigBytes)
+			sigData["decoded"] = decodedHex
+		} else {
+			decodeErr = err
 		}
 	}
 
 	printSection("SIGNATURE:", sigTitle, func() {
-		printPrettySignature(sigPart, decodeBase64)
+		printPrettySignature(sigPart, decodeBase64, decodedHex, decodeErr)
 	}, sigData, outputFormat)
 }
 
-func printPrettySignature(sigPart string, decodeBase64 bool) {
+func printPrettySignature(sigPart string, decodeBase64 bool, decodedHex string, decodeErr error) {
 	keyColor := color.New(color.FgCyan).SprintFunc()
 	labelLength := 12
 
 	fmt.Printf("  %s:%s%s\n", keyColor("Raw"), strings.Repeat(" ", labelLength-3), sigPart)
 
 	if decodeBase64 {
-		sigBytes, err := base64.RawURLEncoding.DecodeString(sigPart)
-		if err != nil {
-			errMsg := fmt.Sprintf("Error decoding: %v", err)
+		if decodeErr != nil {
+			errMsg := fmt.Sprintf("Error decoding: %v", decodeErr)
 			fmt.Printf("  %s:%s%s\n", keyColor("Decoded"), strings.Repeat(" ", labelLength-7), errMsg)
 			return
 		}
-		hexStr := fmt.Sprintf("%x", sigBytes)
-		fmt.Printf("  %s:%s%s\n", keyColor("Decoded (hex)"), strings.Repeat(" ", labelLength-12), hexStr)
+		fmt.Printf("  %s:%s%s\n", keyColor("Decoded (hex)"), strings.Repeat(" ", labelLength-12), decodedHex)
 	}
 }
