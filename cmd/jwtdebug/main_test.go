@@ -30,10 +30,13 @@ func captureStdout(t *testing.T, f func()) string {
 	require.NoError(t, err)
 	os.Stdout = w
 
-	f()
+	defer func() {
+		os.Stdout = old
+		r.Close()
+	}()
 
+	f()
 	w.Close()
-	os.Stdout = old
 
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, r)
@@ -50,10 +53,13 @@ func captureStderr(t *testing.T, f func()) string {
 	require.NoError(t, err)
 	os.Stderr = w
 
-	f()
+	defer func() {
+		os.Stderr = old
+		r.Close()
+	}()
 
+	f()
 	w.Close()
-	os.Stderr = old
 
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, r)
@@ -65,10 +71,14 @@ func captureStderr(t *testing.T, f func()) string {
 func withArgs(t *testing.T, args []string, f func()) {
 	t.Helper()
 	oldArgs := os.Args
+	oldFlagSet := flag.CommandLine
 	os.Args = args
 	// Reset the global flag set so InitFlags can re-register
 	flag.CommandLine = flag.NewFlagSet("jwtdebug", flag.ContinueOnError)
-	defer func() { os.Args = oldArgs }()
+	defer func() {
+		os.Args = oldArgs
+		flag.CommandLine = oldFlagSet
+	}()
 	f()
 }
 
