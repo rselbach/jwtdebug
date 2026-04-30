@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/fatih/color"
+
 	"github.com/rselbach/jwtdebug/internal/cli"
 	"github.com/rselbach/jwtdebug/internal/constants"
 )
@@ -125,7 +127,7 @@ func ApplyConfig(config *Config, f *cli.Flags, ex *cli.Explicit) {
 	}
 	if !ex.IgnoreExpiration {
 		if config.IgnoreExpiration {
-			fmt.Fprintln(os.Stderr, "Warning: ignoring token expiration (from config). Use --ignore-expiration to confirm.")
+			fmt.Fprintln(color.Error, "Warning: ignoring token expiration (from config). Use --ignore-expiration to confirm.")
 		}
 		f.IgnoreExpiration = config.IgnoreExpiration
 	}

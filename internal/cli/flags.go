@@ -3,7 +3,6 @@ package cli
 import (
 	"flag"
 	"fmt"
-	"os"
 
 	"github.com/fatih/color"
 )
@@ -153,7 +152,7 @@ func (f *Flags) CheckExplicitFlags(ex *Explicit) error {
 
 	flag.Visit(func(fl *flag.Flag) {
 		if replacement, ok := deprecatedFlags[fl.Name]; ok {
-			fmt.Fprintf(os.Stderr, "Warning: --%s is deprecated, use %s\n", fl.Name, replacement)
+			fmt.Fprintf(color.Error, "Warning: --%s is deprecated, use %s\n", fl.Name, replacement)
 		}
 
 		switch fl.Name {
@@ -190,7 +189,7 @@ func (f *Flags) CheckExplicitFlags(ex *Explicit) error {
 
 // PrintUsage prints the usage information
 func PrintUsage() {
-	fmt.Fprintf(os.Stderr, `JWT Debug Tool - Decode and analyze JWT tokens
+	fmt.Fprintf(color.Error, `JWT Debug Tool - Decode and analyze JWT tokens
 
 Usage: jwtdebug [options] [token]
        jwtdebug [options] -           # read from stdin explicitly

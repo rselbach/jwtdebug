@@ -28,7 +28,7 @@ func run() int {
 	flag.Parse()
 
 	if err := f.CheckExplicitFlags(ex); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(color.Error, "Error: %v\n", err)
 		return constants.ExitError
 	}
 
@@ -81,7 +81,7 @@ func handleCompletion(f *cli.Flags) (int, bool) {
 func loadConfig(f *cli.Flags, ex *cli.Explicit) (*config.Config, int) {
 	cfg, err := config.LoadConfig(f.ConfigFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to load config: %v\n", err)
+		fmt.Fprintf(color.Error, "Error: failed to load config: %v\n", err)
 		return nil, constants.ExitConfigError
 	}
 
@@ -98,7 +98,7 @@ func handleSaveConfig(cfg *config.Config, f *cli.Flags) (int, bool) {
 
 	savePath := f.ConfigFile
 	if err := config.SaveConfig(cfg, savePath); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Failed to save config: %v\n", err)
+		fmt.Fprintf(color.Error, "Error: Failed to save config: %v\n", err)
 		return constants.ExitConfigError, true
 	}
 	color.Green("Configuration saved successfully.")
@@ -149,7 +149,7 @@ func generateCompletion(shell string) int {
 	case "fish":
 		completions.PrintFish()
 	default:
-		fmt.Fprintf(os.Stderr, "Error: unsupported shell %q (supported: bash, zsh, fish)\n", shell)
+		fmt.Fprintf(color.Error, "Error: unsupported shell %q (supported: bash, zsh, fish)\n", shell)
 		return constants.ExitError
 	}
 	return constants.ExitSuccess
@@ -158,7 +158,7 @@ func generateCompletion(shell string) int {
 func processToken(token string, f *cli.Flags) int {
 	result := parser.ProcessToken(token, f)
 	if result.Err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", result.Err)
+		fmt.Fprintf(color.Error, "Error: %v\n", result.Err)
 		return result.ExitCode
 	}
 	return result.ExitCode
@@ -167,24 +167,24 @@ func processToken(token string, f *cli.Flags) int {
 func processFromStdin(f *cli.Flags, explicit bool) int {
 	stat, err := os.Stdin.Stat()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to stat stdin: %v\n", err)
+		fmt.Fprintf(color.Error, "Error: failed to stat stdin: %v\n", err)
 		return constants.ExitError
 	}
 
 	if (stat.Mode() & os.ModeCharDevice) != 0 {
 		if explicit {
 			if !f.Quiet {
-				fmt.Fprintln(os.Stderr, "Reading token from stdin... (press Ctrl+D when done)")
+				fmt.Fprintln(color.Error, "Reading token from stdin... (press Ctrl+D when done)")
 			}
 		}
 		if !explicit {
-			fmt.Fprintln(os.Stderr, "Error: no token provided")
-			fmt.Fprintln(os.Stderr, "")
-			fmt.Fprintln(os.Stderr, "Usage: jwtdebug [options] <token>")
-			fmt.Fprintln(os.Stderr, "       jwtdebug [options] -           # read from stdin")
-			fmt.Fprintln(os.Stderr, "       command | jwtdebug [options]   # read from pipe")
-			fmt.Fprintln(os.Stderr, "")
-			fmt.Fprintln(os.Stderr, "Run 'jwtdebug --help' for more information.")
+			fmt.Fprintln(color.Error, "Error: no token provided")
+			fmt.Fprintln(color.Error, "")
+			fmt.Fprintln(color.Error, "Usage: jwtdebug [options] <token>")
+			fmt.Fprintln(color.Error, "       jwtdebug [options] -           # read from stdin")
+			fmt.Fprintln(color.Error, "       command | jwtdebug [options]   # read from pipe")
+			fmt.Fprintln(color.Error, "")
+			fmt.Fprintln(color.Error, "Run 'jwtdebug --help' for more information.")
 			return constants.ExitError
 		}
 	}
@@ -206,12 +206,12 @@ func processFromStdin(f *cli.Flags, explicit bool) int {
 	}
 
 	if err := scanner.Err(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to read stdin: %v\n", err)
+		fmt.Fprintf(color.Error, "Error: failed to read stdin: %v\n", err)
 		return constants.ExitError
 	}
 
 	if !hasToken {
-		fmt.Fprintln(os.Stderr, "Error: no token provided on stdin")
+		fmt.Fprintln(color.Error, "Error: no token provided on stdin")
 		return constants.ExitError
 	}
 

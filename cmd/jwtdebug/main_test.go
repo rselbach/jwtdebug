@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/require"
 )
@@ -26,12 +27,15 @@ func captureStdout(t *testing.T, f func()) string {
 	t.Helper()
 
 	old := os.Stdout
+	oldColorOut := color.Output
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
 	os.Stdout = w
+	color.Output = w
 
 	defer func() {
 		os.Stdout = old
+		color.Output = oldColorOut
 		r.Close()
 	}()
 
@@ -49,12 +53,15 @@ func captureStderr(t *testing.T, f func()) string {
 	t.Helper()
 
 	old := os.Stderr
+	oldColorErr := color.Error
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
 	os.Stderr = w
+	color.Error = w
 
 	defer func() {
 		os.Stderr = old
+		color.Error = oldColorErr
 		r.Close()
 	}()
 
