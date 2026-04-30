@@ -96,7 +96,7 @@ func formatRawValue(v any) string {
 }
 
 func printSection(title string, titleColor *color.Color, pretty func(), data any, outputFormat string) {
-	fmt.Println(titleColor.SprintFunc()(title))
+	fmt.Println(titleColor.Sprint(title))
 	if outputFormat == "pretty" || outputFormat == "" {
 		pretty()
 		fmt.Println()
