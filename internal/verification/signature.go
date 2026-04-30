@@ -91,48 +91,33 @@ func VerifyTokenSignature(tokenString, keyFile string, ignoreExpiration bool) er
 	return err
 }
 
+var nonTimeValidationErrors = []error{
+	jwt.ErrTokenSignatureInvalid,
+	jwt.ErrTokenMalformed,
+	jwt.ErrTokenUnverifiable,
+	jwt.ErrTokenRequiredClaimMissing,
+	jwt.ErrTokenInvalidAudience,
+	jwt.ErrTokenInvalidIssuer,
+	jwt.ErrTokenInvalidSubject,
+	jwt.ErrTokenInvalidId,
+	jwt.ErrTokenUsedBeforeIssued,
+}
+
 func onlyTimeValidationErrors(err error) bool {
 	if err == nil {
 		return false
 	}
 
-	hasTimeError := false
+	hasTime := errors.Is(err, jwt.ErrTokenExpired) || errors.Is(err, jwt.ErrTokenNotValidYet)
+	if !hasTime {
+		return false
+	}
 
-	var walk func(error) bool
-	walk = func(e error) bool {
-		if e == nil {
-			return true
-		}
-
-		if errors.Is(e, jwt.ErrTokenExpired) || errors.Is(e, jwt.ErrTokenNotValidYet) {
-			hasTimeError = true
-			return true
-		}
-		if errors.Is(e, jwt.ErrTokenInvalidClaims) {
-			return true
-		}
-
-		if multi, ok := e.(interface{ Unwrap() []error }); ok {
-			for _, inner := range multi.Unwrap() {
-				if !walk(inner) {
-					return false
-				}
-			}
-			return true
-		}
-		if single, ok := e.(interface{ Unwrap() error }); ok {
-			if inner := single.Unwrap(); inner != nil {
-				return walk(inner)
-			}
+	for _, e := range nonTimeValidationErrors {
+		if errors.Is(err, e) {
 			return false
 		}
-
-		return false
 	}
 
-	if !walk(err) {
-		return false
-	}
-
-	return hasTimeError
+	return true
 }
