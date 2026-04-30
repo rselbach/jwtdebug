@@ -2,10 +2,14 @@ version: "2"
 
 linters:
   enable:
-    - govet
     - errcheck
-    - staticcheck
+    - errname
+    - gocritic
+    - govet
     - ineffassign
+    - misspell
+    - revive
+    - staticcheck
     - unused
   settings:
     errcheck:
@@ -21,6 +25,7 @@ linters:
 formatters:
   enable:
     - gofmt
+    - gofumpt
   settings:
     gofmt:
       simplify: true
