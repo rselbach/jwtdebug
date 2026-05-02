@@ -7,8 +7,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func resetFlags() *Flags {
+func resetFlags(t *testing.T) *Flags {
+	t.Helper()
+	old := flag.CommandLine
 	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
+	t.Cleanup(func() { flag.CommandLine = old })
 	return &Flags{}
 }
 
@@ -41,7 +44,7 @@ func TestValidateFormat(t *testing.T) {
 
 func TestInitFlags(t *testing.T) {
 	r := require.New(t)
-	f := resetFlags()
+	f := resetFlags(t)
 	InitFlags(f)
 
 	// Use -format (deprecated alias) to verify it still works and sets explicit flag
@@ -61,7 +64,7 @@ func TestInitFlags(t *testing.T) {
 func TestApplyAllFlag(t *testing.T) {
 	t.Run("all flag enables everything", func(t *testing.T) {
 		r := require.New(t)
-		f := resetFlags()
+		f := resetFlags(t)
 		f.ShowAll = true
 		f.ApplyAllFlag()
 
@@ -73,7 +76,7 @@ func TestApplyAllFlag(t *testing.T) {
 
 	t.Run("without all flag nothing changes", func(t *testing.T) {
 		r := require.New(t)
-		f := resetFlags()
+		f := resetFlags(t)
 		f.ShowAll = false
 		f.ApplyAllFlag()
 
@@ -86,7 +89,7 @@ func TestApplyAllFlag(t *testing.T) {
 
 func TestFlagPrecedence(t *testing.T) {
 	r := require.New(t)
-	f := resetFlags()
+	f := resetFlags(t)
 	InitFlags(f)
 
 	err := flag.CommandLine.Parse([]string{"-claims=false"})
@@ -100,16 +103,37 @@ func TestFlagPrecedence(t *testing.T) {
 }
 
 func TestDeprecatedFlagWarnings(t *testing.T) {
-	r := require.New(t)
-	f := resetFlags()
-	InitFlags(f)
+	t.Run("deprecated alias sets explicit flag", func(t *testing.T) {
+		r := require.New(t)
+		f := resetFlags(t)
+		InitFlags(f)
 
-	err := flag.CommandLine.Parse([]string{"-key", "somefile"})
-	r.NoError(err)
+		err := flag.CommandLine.Parse([]string{"-key", "somefile"})
+		r.NoError(err)
 
-	ex := &Explicit{}
-	r.NoError(f.CheckExplicitFlags(ex))
+		ex := &Explicit{}
+		r.NoError(f.CheckExplicitFlags(ex))
 
-	r.True(ex.KeyFile)
-	r.Equal("somefile", f.KeyFile)
+		r.True(ex.KeyFile)
+		r.Equal("somefile", f.KeyFile)
+	})
+
+	t.Run("deprecated aliases have replacement hints in registry", func(t *testing.T) {
+		r := require.New(t)
+
+		r.Equal("--key-file", flagRegistry["key"].deprecatedRepl)
+		r.Equal("--output", flagRegistry["format"].deprecatedRepl)
+		r.Equal("--expiration", flagRegistry["expiry"].deprecatedRepl)
+		r.Equal("--decode-signature", flagRegistry["decode-sig"].deprecatedRepl)
+		r.Equal("--ignore-expiration", flagRegistry["ignore-exp"].deprecatedRepl)
+	})
+
+	t.Run("non-deprecated flags have empty replacement", func(t *testing.T) {
+		r := require.New(t)
+
+		r.Empty(flagRegistry["header"].deprecatedRepl)
+		r.Empty(flagRegistry["claims"].deprecatedRepl)
+		r.Empty(flagRegistry["key-file"].deprecatedRepl)
+		r.Empty(flagRegistry["output"].deprecatedRepl)
+	})
 }

@@ -57,11 +57,13 @@ func TestFormatData(t *testing.T) {
 		"key2": 42,
 	}
 
-	jsonResult := FormatData(testData, "json")
+	jsonResult, err := FormatData(testData, "json")
+	r.NoError(err)
 	r.Contains(jsonResult, "\"key1\": \"value1\"", "JSON formatter not used correctly")
 
-	defaultResult := FormatData(testData, "unsupported")
-	r.Contains(defaultResult, "\"key1\": \"value1\"", "Default formatter (JSON) not used for unsupported format")
+	_, err = FormatData(testData, "unsupported")
+	r.Error(err, "Expected error for unsupported format")
+	r.Contains(err.Error(), "unsupported format")
 }
 
 func compareValues(expected, actual any) bool {

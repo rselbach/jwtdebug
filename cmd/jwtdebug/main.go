@@ -143,11 +143,11 @@ func printVersion(f *cli.Flags) {
 func generateCompletion(shell string) int {
 	switch strings.ToLower(shell) {
 	case "bash":
-		completions.PrintBash()
+		fmt.Print(completions.Bash())
 	case "zsh":
-		completions.PrintZsh()
+		fmt.Print(completions.Zsh())
 	case "fish":
-		completions.PrintFish()
+		fmt.Print(completions.Fish())
 	default:
 		fmt.Fprintf(color.Error, "Error: unsupported shell %q (supported: bash, zsh, fish)\n", shell)
 		return constants.ExitError
@@ -164,28 +164,37 @@ func processToken(token string, f *cli.Flags) int {
 	return result.ExitCode
 }
 
-func processFromStdin(f *cli.Flags, explicit bool) int {
+func isTerminal() bool {
 	stat, err := os.Stdin.Stat()
 	if err != nil {
-		fmt.Fprintf(color.Error, "Error: failed to stat stdin: %v\n", err)
-		return constants.ExitError
+		return false
 	}
+	return (stat.Mode() & os.ModeCharDevice) != 0
+}
 
-	if (stat.Mode() & os.ModeCharDevice) != 0 {
+func printUsageHint() {
+	fmt.Fprintln(color.Error, "Error: no token provided")
+	fmt.Fprintln(color.Error, "")
+	fmt.Fprintln(color.Error, "Usage: jwtdebug [options] <token>")
+	fmt.Fprintln(color.Error, "       jwtdebug [options] -           # read from stdin")
+	fmt.Fprintln(color.Error, "       command | jwtdebug [options]   # read from pipe")
+	fmt.Fprintln(color.Error, "")
+	fmt.Fprintln(color.Error, "Run 'jwtdebug --help' for more information.")
+}
+
+func processFromStdin(f *cli.Flags, explicit bool) int {
+	if isTerminal() {
 		if explicit {
 			if !f.Quiet {
 				fmt.Fprintln(color.Error, "Reading token from stdin... (press Ctrl+D when done)")
 			}
 		}
 		if !explicit {
-			fmt.Fprintln(color.Error, "Error: no token provided")
-			fmt.Fprintln(color.Error, "")
-			fmt.Fprintln(color.Error, "Usage: jwtdebug [options] <token>")
-			fmt.Fprintln(color.Error, "       jwtdebug [options] -           # read from stdin")
-			fmt.Fprintln(color.Error, "       command | jwtdebug [options]   # read from pipe")
-			fmt.Fprintln(color.Error, "")
-			fmt.Fprintln(color.Error, "Run 'jwtdebug --help' for more information.")
+			printUsageHint()
 			return constants.ExitError
+		}
+		if !f.Quiet {
+			fmt.Fprintln(color.Error, "Reading token from stdin... (press Ctrl+D when done)")
 		}
 	}
 
@@ -199,8 +208,7 @@ func processFromStdin(f *cli.Flags, explicit bool) int {
 			continue
 		}
 		hasToken = true
-		exitCode := processToken(line, f)
-		if exitCode != constants.ExitSuccess {
+		if exitCode := processToken(line, f); exitCode != constants.ExitSuccess {
 			return exitCode
 		}
 	}

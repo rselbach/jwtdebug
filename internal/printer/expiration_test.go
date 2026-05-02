@@ -36,8 +36,9 @@ func TestTryParseTimestamp_OutOfRange(t *testing.T) {
 }
 
 func captureOutput(f func()) string {
+	oldNoColor := color.NoColor
 	color.NoColor = true
-	defer func() { color.NoColor = false }()
+	defer func() { color.NoColor = oldNoColor }()
 
 	oldStdout := os.Stdout
 	oldColorOutput := color.Output

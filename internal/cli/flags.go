@@ -139,45 +139,46 @@ func InitFlags(f *Flags) {
 	flag.Usage = PrintUsage
 }
 
+type flagMeta struct {
+	setExplicit    func(*Explicit)
+	deprecatedRepl string
+}
+
+var flagRegistry = map[string]flagMeta{
+	"header":            {func(ex *Explicit) { ex.Header = true }, ""},
+	"H":                 {func(ex *Explicit) { ex.Header = true }, ""},
+	"claims":            {func(ex *Explicit) { ex.Claims = true }, ""},
+	"c":                 {func(ex *Explicit) { ex.Claims = true }, ""},
+	"signature":         {func(ex *Explicit) { ex.Signature = true }, ""},
+	"s":                 {func(ex *Explicit) { ex.Signature = true }, ""},
+	"key-file":          {func(ex *Explicit) { ex.KeyFile = true }, ""},
+	"k":                 {func(ex *Explicit) { ex.KeyFile = true }, ""},
+	"key":               {func(ex *Explicit) { ex.KeyFile = true }, "--key-file"},
+	"output":            {func(ex *Explicit) { ex.Format = true }, ""},
+	"o":                 {func(ex *Explicit) { ex.Format = true }, ""},
+	"format":            {func(ex *Explicit) { ex.Format = true }, "--output"},
+	"color":             {func(ex *Explicit) { ex.Color = true }, ""},
+	"expiration":        {func(ex *Explicit) { ex.Expiration = true }, ""},
+	"e":                 {func(ex *Explicit) { ex.Expiration = true }, ""},
+	"expiry":            {func(ex *Explicit) { ex.Expiration = true }, "--expiration"},
+	"decode-signature":  {func(ex *Explicit) { ex.DecodeBase64 = true }, ""},
+	"decode-sig":        {func(ex *Explicit) { ex.DecodeBase64 = true }, "--decode-signature"},
+	"ignore-expiration": {func(ex *Explicit) { ex.IgnoreExpiration = true }, ""},
+	"ignore-exp":        {func(ex *Explicit) { ex.IgnoreExpiration = true }, "--ignore-expiration"},
+}
+
 // CheckExplicitFlags checks which flags were explicitly set by the user.
 // Returns an error if the format flag was set to an invalid value.
 func (f *Flags) CheckExplicitFlags(ex *Explicit) error {
-	deprecatedFlags := map[string]string{
-		"key":        "--key-file",
-		"ignore-exp": "--ignore-expiration",
-		"format":     "--output",
-		"expiry":     "--expiration",
-		"decode-sig": "--decode-signature",
-	}
-
 	flag.Visit(func(fl *flag.Flag) {
-		if replacement, ok := deprecatedFlags[fl.Name]; ok {
-			fmt.Fprintf(color.Error, "Warning: --%s is deprecated, use %s\n", fl.Name, replacement)
-		}
-
-		switch fl.Name {
-		case "header", "H":
-			ex.Header = true
-		case "claims", "c":
-			ex.Claims = true
-		case "signature", "s":
-			ex.Signature = true
-		case "key-file", "k", "key":
-			ex.KeyFile = true
-		case "output", "o", "format":
-			ex.Format = true
-		case "color":
-			ex.Color = true
-		case "expiration", "e", "expiry":
-			ex.Expiration = true
-		case "decode-signature", "decode-sig":
-			ex.DecodeBase64 = true
-		case "ignore-expiration", "ignore-exp":
-			ex.IgnoreExpiration = true
+		if meta, ok := flagRegistry[fl.Name]; ok {
+			if meta.deprecatedRepl != "" {
+				fmt.Fprintf(color.Error, "Warning: --%s is deprecated, use %s\n", fl.Name, meta.deprecatedRepl)
+			}
+			meta.setExplicit(ex)
 		}
 	})
 
-	// Validate format if it was set
 	if ex.Format {
 		if err := validateFormat(f.OutputFormat); err != nil {
 			return err

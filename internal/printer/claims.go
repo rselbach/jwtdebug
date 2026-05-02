@@ -3,7 +3,6 @@ package printer
 import (
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/fatih/color"
 	"github.com/golang-jwt/jwt/v5"
@@ -51,58 +50,44 @@ func printPrettyClaims(claims jwt.MapClaims) {
 
 	standardOrder := []string{"iss", "sub", "aud", "exp", "nbf", "iat", "jti"}
 
-	standardPresent := make(map[string]bool)
-	var customKeys []string
-
-	maxKeyLen := 0
-
-	for key := range claims {
-		if displayName, ok := standardClaims[key]; ok {
-			standardPresent[key] = true
-			if len(displayName) > maxKeyLen {
-				maxKeyLen = len(displayName)
-			}
-			continue
+	// Build standard lines and collect all keys for max length calculation.
+	var standardLines [][2]string
+	allKeys := make([]string, 0, len(claims))
+	for _, key := range standardOrder {
+		if val, ok := claims[key]; ok {
+			displayKey := standardClaims[key]
+			standardLines = append(standardLines, [2]string{displayKey, formatClaimValue(val, isStandardTimestampClaim(key))})
+			allKeys = append(allKeys, displayKey)
 		}
+	}
 
-		customKeys = append(customKeys, key)
-		if len(key) > maxKeyLen {
-			maxKeyLen = len(key)
+	var customKeys []string
+	for key := range claims {
+		if _, ok := standardClaims[key]; !ok {
+			customKeys = append(customKeys, key)
+			allKeys = append(allKeys, key)
 		}
 	}
 	sort.Strings(customKeys)
 
-	sectionTitleColor := color.New(color.FgGreen, color.Bold).SprintFunc()
-	keyColor := color.New(color.FgCyan).SprintFunc()
-
-	if len(standardPresent) > 0 {
-		fmt.Println(sectionTitleColor("  Standard Claims:"))
-
-		for _, preferred := range standardOrder {
-			if !standardPresent[preferred] {
-				continue
-			}
-
-			displayKey := standardClaims[preferred]
-			paddedKey := fmt.Sprintf("    %s:%s", keyColor(displayKey), strings.Repeat(" ", maxKeyLen-len(displayKey)+1))
-
-			val := claims[preferred]
-			formattedValue := formatClaimValue(val, isStandardTimestampClaim(preferred))
-			fmt.Printf("%s%v\n", paddedKey, formattedValue)
-		}
+	var customLines [][2]string
+	for _, key := range customKeys {
+		customLines = append(customLines, [2]string{key, formatClaimValue(claims[key], true)})
 	}
 
-	if len(customKeys) > 0 {
-		if len(standardPresent) > 0 {
+	maxKeyLen := maxStringLength(allKeys)
+	sectionTitleColor := color.New(color.FgGreen, color.Bold).SprintFunc()
+
+	if len(standardLines) > 0 {
+		fmt.Println(sectionTitleColor("  Standard Claims:"))
+		printKeyValueLines(standardLines, 4, maxKeyLen)
+	}
+
+	if len(customLines) > 0 {
+		if len(standardLines) > 0 {
 			fmt.Println()
 		}
-
 		fmt.Println(sectionTitleColor("  Custom Claims:"))
-		for _, key := range customKeys {
-			paddedKey := fmt.Sprintf("    %s:%s", keyColor(key), strings.Repeat(" ", maxKeyLen-len(key)+1))
-
-			formattedValue := formatClaimValue(claims[key], true)
-			fmt.Printf("%s%v\n", paddedKey, formattedValue)
-		}
+		printKeyValueLines(customLines, 4, maxKeyLen)
 	}
 }

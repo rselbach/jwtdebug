@@ -2,8 +2,6 @@ package printer
 
 import (
 	"fmt"
-	"sort"
-	"strings"
 
 	"github.com/fatih/color"
 	"github.com/golang-jwt/jwt/v5"
@@ -23,20 +21,10 @@ func printPrettyHeader(header map[string]any) {
 		return
 	}
 
-	var keys []string
-	maxKeyLen := 0
-	for k := range header {
-		keys = append(keys, k)
-		if len(k) > maxKeyLen {
-			maxKeyLen = len(k)
-		}
-	}
-	sort.Strings(keys)
-
-	keyColor := color.New(color.FgCyan).SprintFunc()
+	keys := sortedKeys(header)
+	lines := make([][2]string, 0, len(keys))
 	for _, k := range keys {
-		sanitizedKey := sanitizeString(k)
-		paddedKey := fmt.Sprintf("  %s:%s", keyColor(sanitizedKey), strings.Repeat(" ", maxKeyLen-len(k)+1))
-		fmt.Printf("%s%s\n", paddedKey, formatValue(header[k]))
+		lines = append(lines, [2]string{sanitizeString(k), formatValue(header[k])})
 	}
+	printKeyValueLines(lines, 2, maxStringLength(keys))
 }

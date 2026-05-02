@@ -12,7 +12,6 @@ func init() {
 	for i := 0; i < 0x20; i++ {
 		controlCharEscapes[i] = fmt.Sprintf("\\x%02X", i)
 	}
-	controlCharEscapes[0x1b] = "\\x1B"
 	controlCharEscapes[0x7f] = "\\x7F"
 }
 
@@ -41,11 +40,7 @@ func sanitizeString(s string) string {
 			b.WriteString("\\t")
 		default:
 			if r < 0x20 || r == 0x7f {
-				if r < 0x80 {
-					b.WriteString(controlCharEscapes[r])
-				} else {
-					fmt.Fprintf(&b, "\\u%04X", r)
-				}
+				b.WriteString(controlCharEscapes[r])
 				continue
 			}
 			// Unicode C1 control characters (0x80-0x9F)

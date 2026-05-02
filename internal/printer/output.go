@@ -9,16 +9,17 @@ import (
 	"github.com/fatih/color"
 )
 
-// FormatData returns a string representation of data in the specified format
-func FormatData(data any, outputFormat string) string {
+// FormatData returns a string representation of data in the specified format.
+// Supported formats are "pretty", "json", and "raw". An empty format is
+// treated as "pretty".
+func FormatData(data any, outputFormat string) (string, error) {
 	switch outputFormat {
-	case "pretty", "json":
-		return formatJSON(data)
+	case "pretty", "json", "":
+		return formatJSON(data), nil
 	case "raw":
-		return formatRaw(data)
+		return formatRaw(data), nil
 	default:
-		fmt.Fprintf(color.Error, "Warning: Unsupported format '%s', using 'json' instead\n", outputFormat)
-		return formatJSON(data)
+		return "", fmt.Errorf("unsupported format %q", outputFormat)
 	}
 }
 
@@ -102,6 +103,47 @@ func printSection(title string, titleColor *color.Color, pretty func(), data any
 		fmt.Println()
 		return
 	}
-	fmt.Println(FormatData(data, outputFormat))
+	formatted, err := FormatData(data, outputFormat)
+	if err != nil {
+		fmt.Fprintf(color.Error, "Warning: %v, using 'json' instead\n", err)
+		formatted = formatJSON(data)
+	}
+	fmt.Println(formatted)
 	fmt.Println()
+}
+
+// maxStringLength returns the maximum length of strings in the slice.
+func maxStringLength(strs []string) int {
+	maxLen := 0
+	for _, s := range strs {
+		if len(s) > maxLen {
+			maxLen = len(s)
+		}
+	}
+	return maxLen
+}
+
+// sortedKeys returns the keys of a map sorted alphabetically.
+func sortedKeys(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// printKeyValueLines prints colored, padded key-value pairs.
+// Each pair is a [2]string{key, value}. The indent parameter controls
+// leading whitespace. maxKeyLen is used to align the colons.
+func printKeyValueLines(lines [][2]string, indent int, maxKeyLen int) {
+	if len(lines) == 0 {
+		return
+	}
+	keyColor := color.New(color.FgCyan).SprintFunc()
+	spaces := strings.Repeat(" ", indent)
+	for _, line := range lines {
+		paddedKey := fmt.Sprintf("%s%s:%s", spaces, keyColor(line[0]), strings.Repeat(" ", maxKeyLen-len(line[0])+1))
+		fmt.Printf("%s%s\n", paddedKey, line[1])
+	}
 }

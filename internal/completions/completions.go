@@ -1,9 +1,5 @@
 package completions
 
-import (
-	"fmt"
-)
-
 // Bash returns the bash completion script
 func Bash() string {
 	return `# jwtdebug bash completion
@@ -122,19 +118,4 @@ complete -c jwtdebug -s q -l quiet -d 'Suppress informational notices'
 complete -c jwtdebug -s v -l verbose -d 'Enable verbose output'
 complete -c jwtdebug -l strict -d 'Disable smart token extraction'
 `
-}
-
-// PrintBash prints the bash completion script to stdout
-func PrintBash() {
-	fmt.Print(Bash())
-}
-
-// PrintZsh prints the zsh completion script to stdout
-func PrintZsh() {
-	fmt.Print(Zsh())
-}
-
-// PrintFish prints the fish completion script to stdout
-func PrintFish() {
-	fmt.Print(Fish())
 }

@@ -99,38 +99,26 @@ func LoadConfig(configFile string) (*Config, error) {
 	return config, nil
 }
 
+func applyIfNotExplicit[T any](explicit bool, field *T, configVal T) {
+	if !explicit {
+		*field = configVal
+	}
+}
+
 // ApplyConfig applies the configuration to CLI flags if they weren't explicitly set
 func ApplyConfig(config *Config, f *cli.Flags, ex *cli.Explicit) {
-	if !ex.Format {
-		f.OutputFormat = config.DefaultFormat
+	applyIfNotExplicit(ex.Format, &f.OutputFormat, config.DefaultFormat)
+	applyIfNotExplicit(ex.Color, &f.OutputColor, config.ColorEnabled)
+	applyIfNotExplicit(ex.KeyFile, &f.KeyFile, config.DefaultKeyFile)
+	applyIfNotExplicit(ex.Header, &f.WithHeader, config.ShowHeader)
+	applyIfNotExplicit(ex.Claims, &f.WithClaims, config.ShowClaims)
+	applyIfNotExplicit(ex.Signature, &f.WithSignature, config.ShowSignature)
+	applyIfNotExplicit(ex.Expiration, &f.ShowExpiration, config.ShowExpiration)
+	applyIfNotExplicit(ex.DecodeBase64, &f.DecodeBase64, config.DecodeSignature)
+	if !ex.IgnoreExpiration && config.IgnoreExpiration {
+		fmt.Fprintln(color.Error, "Warning: ignoring token expiration (from config). Use --ignore-expiration to confirm.")
 	}
-	if !ex.Color {
-		f.OutputColor = config.ColorEnabled
-	}
-	if !ex.KeyFile && f.KeyFile == "" {
-		f.KeyFile = config.DefaultKeyFile
-	}
-	if !ex.Header {
-		f.WithHeader = config.ShowHeader
-	}
-	if !ex.Claims {
-		f.WithClaims = config.ShowClaims
-	}
-	if !ex.Signature {
-		f.WithSignature = config.ShowSignature
-	}
-	if !ex.Expiration {
-		f.ShowExpiration = config.ShowExpiration
-	}
-	if !ex.DecodeBase64 {
-		f.DecodeBase64 = config.DecodeSignature
-	}
-	if !ex.IgnoreExpiration {
-		if config.IgnoreExpiration {
-			fmt.Fprintln(color.Error, "Warning: ignoring token expiration (from config). Use --ignore-expiration to confirm.")
-		}
-		f.IgnoreExpiration = config.IgnoreExpiration
-	}
+	applyIfNotExplicit(ex.IgnoreExpiration, &f.IgnoreExpiration, config.IgnoreExpiration)
 }
 
 // UpdateFromCLI updates the config with CLI values.

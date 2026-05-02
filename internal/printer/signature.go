@@ -3,7 +3,6 @@ package printer
 import (
 	"encoding/base64"
 	"fmt"
-	"strings"
 
 	"github.com/fatih/color"
 )
@@ -33,17 +32,17 @@ func PrintSignature(sigPart, outputFormat string, decodeBase64 bool) {
 }
 
 func printPrettySignature(sigPart string, decodeBase64 bool, decodedHex string, decodeErr error) {
-	keyColor := color.New(color.FgCyan).SprintFunc()
-	labelLength := 12
-
-	fmt.Printf("  %s:%s%s\n", keyColor("Raw"), strings.Repeat(" ", labelLength-3), sigPart)
+	maxLen := len("Raw")
+	lines := [][2]string{{"Raw", sigPart}}
 
 	if decodeBase64 {
+		maxLen = len("Decoded (hex)")
 		if decodeErr != nil {
-			errMsg := fmt.Sprintf("Error decoding: %v", decodeErr)
-			fmt.Printf("  %s:%s%s\n", keyColor("Decoded"), strings.Repeat(" ", labelLength-7), errMsg)
-			return
+			lines = append(lines, [2]string{"Decoded", fmt.Sprintf("Error decoding: %v", decodeErr)})
+		} else {
+			lines = append(lines, [2]string{"Decoded (hex)", decodedHex})
 		}
-		fmt.Printf("  %s:%s%s\n", keyColor("Decoded (hex)"), strings.Repeat(" ", labelLength-12), decodedHex)
 	}
+
+	printKeyValueLines(lines, 2, maxLen)
 }
