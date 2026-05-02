@@ -12,5 +12,4 @@ const (
 	ExitError            = 1 // General error
 	ExitInvalidToken     = 2 // Token parsing/format error
 	ExitVerificationFail = 3 // Signature verification failed
-	ExitConfigError      = 4 // Configuration error
 )

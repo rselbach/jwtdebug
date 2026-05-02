@@ -25,7 +25,7 @@ func run() int {
 }
 
 func runWithArgs(args []string) int {
-	f, _, positionalArgs, err := cli.Parse(args)
+	f, positionalArgs, err := cli.Parse(args)
 	if err != nil {
 		fmt.Fprintf(color.Error, "Error: %v\n", err)
 		return constants.ExitError

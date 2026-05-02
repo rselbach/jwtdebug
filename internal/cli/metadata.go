@@ -16,47 +16,46 @@ type OptionSpec struct {
 	Deprecated  string
 	ArgHint     string
 	setFlag     func(*flag.FlagSet, *Flags)
-	setExplicit func(*Explicit)
 }
 
 // AllOptionSpecs returns the complete option specification table.
 func AllOptionSpecs() []OptionSpec {
-	return allSpecs(&Flags{}, &Explicit{})
+	return allSpecs(&Flags{})
 }
 
 // allSpecs returns the complete option specification table.
-func allSpecs(f *Flags, ex *Explicit) []OptionSpec {
+func allSpecs(f *Flags) []OptionSpec {
 	return []OptionSpec{
 		// Display
-		boolSpec([]string{"header", "H"}, "show token header", "Display", &f.Header, false, func(e *Explicit) { e.Header = true }, ""),
-		boolSpec([]string{"claims", "c"}, "show token claims (payload)", "Display", &f.Claims, true, func(e *Explicit) { e.Claims = true }, ""),
-		boolSpec([]string{"signature", "s"}, "show token signature", "Display", &f.Signature, false, func(e *Explicit) { e.Signature = true }, ""),
-		boolSpec([]string{"all", "a"}, "show all token parts and info", "Display", &f.ShowAll, false, func(e *Explicit) {}, ""),
-		boolSpec([]string{"expiration", "e"}, "check token expiration status", "Display", &f.Expiration, false, func(e *Explicit) { e.Expiration = true }, ""),
-		boolSpec([]string{"raw-claims"}, "output only raw claims JSON (for piping to jq)", "Display", &f.RawClaims, false, func(e *Explicit) {}, ""),
+		boolSpec([]string{"header", "H"}, "show token header", "Display", &f.Header, false, ""),
+		boolSpec([]string{"claims", "c"}, "show token claims (payload)", "Display", &f.Claims, true, ""),
+		boolSpec([]string{"signature", "s"}, "show token signature", "Display", &f.Signature, false, ""),
+		boolSpec([]string{"all", "a"}, "show all token parts and info", "Display", &f.ShowAll, false, ""),
+		boolSpec([]string{"expiration", "e"}, "check token expiration status", "Display", &f.Expiration, false, ""),
+		boolSpec([]string{"raw-claims"}, "output only raw claims JSON (for piping to jq)", "Display", &f.RawClaims, false, ""),
 
 		// Verification
-		boolSpec([]string{"verify", "V"}, "verify token signature (requires --key-file)", "Verification", &f.VerifySignature, false, func(e *Explicit) {}, ""),
-		stringSpec([]string{"key-file", "k"}, "key file for signature verification", "Verification", &f.KeyFile, "", func(e *Explicit) { e.KeyFile = true }, "<file>", ""),
-		boolSpec([]string{"ignore-expiration"}, "ignore token expiration when verifying", "Verification", &f.IgnoreExpiration, false, func(e *Explicit) { e.IgnoreExpiration = true }, ""),
+		boolSpec([]string{"verify", "V"}, "verify token signature (requires --key-file)", "Verification", &f.VerifySignature, false, ""),
+		stringSpec([]string{"key-file", "k"}, "key file for signature verification", "Verification", &f.KeyFile, "", "<file>", ""),
+		boolSpec([]string{"ignore-expiration"}, "ignore token expiration when verifying", "Verification", &f.IgnoreExpiration, false, ""),
 
 		// Input
-		boolSpec([]string{"strict"}, "disable smart extraction (expect exact JWT input)", "Input", &f.Strict, false, func(e *Explicit) {}, ""),
+		boolSpec([]string{"strict"}, "disable smart extraction (expect exact JWT input)", "Input", &f.Strict, false, ""),
 
 		// Other
-		boolSpec([]string{"help", "h"}, "show help message", "Other", &f.ShowHelp, false, func(e *Explicit) {}, ""),
-		boolSpec([]string{"version"}, "show version information", "Other", &f.ShowVersion, false, func(e *Explicit) {}, ""),
-		boolSpec([]string{"quiet", "q"}, "suppress informational notices", "Other", &f.Quiet, false, func(e *Explicit) {}, ""),
-		boolSpec([]string{"verbose", "v"}, "enable verbose output for debugging", "Other", &f.Verbose, false, func(e *Explicit) {}, ""),
+		boolSpec([]string{"help", "h"}, "show help message", "Other", &f.ShowHelp, false, ""),
+		boolSpec([]string{"version"}, "show version information", "Other", &f.ShowVersion, false, ""),
+		boolSpec([]string{"quiet", "q"}, "suppress informational notices", "Other", &f.Quiet, false, ""),
+		boolSpec([]string{"verbose", "v"}, "enable verbose output for debugging", "Other", &f.Verbose, false, ""),
 
 		// Deprecated aliases
-		stringSpec([]string{"key"}, "key file", "Verification", &f.KeyFile, "", func(e *Explicit) { e.KeyFile = true }, "", "--key-file"),
-		boolSpec([]string{"expiry"}, "check expiration", "Display", &f.Expiration, false, func(e *Explicit) { e.Expiration = true }, "--expiration"),
-		boolSpec([]string{"ignore-exp"}, "ignore expiration", "Verification", &f.IgnoreExpiration, false, func(e *Explicit) { e.IgnoreExpiration = true }, "--ignore-expiration"),
+		stringSpec([]string{"key"}, "key file", "Verification", &f.KeyFile, "", "", "--key-file"),
+		boolSpec([]string{"expiry"}, "check expiration", "Display", &f.Expiration, false, "--expiration"),
+		boolSpec([]string{"ignore-exp"}, "ignore expiration", "Verification", &f.IgnoreExpiration, false, "--ignore-expiration"),
 	}
 }
 
-func boolSpec(names []string, desc, category string, ptr *bool, def bool, setter func(*Explicit), deprecated string) OptionSpec {
+func boolSpec(names []string, desc, category string, ptr *bool, def bool, deprecated string) OptionSpec {
 	s := OptionSpec{
 		Names: names, Description: desc, Category: category, Deprecated: deprecated,
 		setFlag: func(fs *flag.FlagSet, f *Flags) {
@@ -64,7 +63,6 @@ func boolSpec(names []string, desc, category string, ptr *bool, def bool, setter
 				fs.BoolVar(ptr, name, def, desc)
 			}
 		},
-		setExplicit: setter,
 	}
 	if deprecated != "" {
 		s.Description += " (deprecated: use " + deprecated + ")"
@@ -72,7 +70,7 @@ func boolSpec(names []string, desc, category string, ptr *bool, def bool, setter
 	return s
 }
 
-func stringSpec(names []string, desc, category string, ptr *string, def string, setter func(*Explicit), argHint string, deprecated string) OptionSpec {
+func stringSpec(names []string, desc, category string, ptr *string, def string, argHint string, deprecated string) OptionSpec {
 	s := OptionSpec{
 		Names: names, Description: desc, Category: category, Deprecated: deprecated, ArgHint: argHint,
 		setFlag: func(fs *flag.FlagSet, f *Flags) {
@@ -80,7 +78,6 @@ func stringSpec(names []string, desc, category string, ptr *string, def string, 
 				fs.StringVar(ptr, name, def, desc)
 			}
 		},
-		setExplicit: setter,
 	}
 	if deprecated != "" {
 		s.Description += " (deprecated: use " + deprecated + ")"
@@ -90,17 +87,16 @@ func stringSpec(names []string, desc, category string, ptr *string, def string, 
 
 // InitFlags initializes all command-line flags on the provided FlagSet and Flags struct.
 func InitFlags(fs *flag.FlagSet, f *Flags) {
-	ex := &Explicit{}
-	specs := allSpecs(f, ex)
+	specs := allSpecs(f)
 	for i := range specs {
 		specs[i].setFlag(fs, f)
 	}
 	fs.Usage = PrintUsage
 }
 
-// CheckExplicitFlags checks which flags were explicitly set by the user.
-func (f *Flags) CheckExplicitFlags(fs *flag.FlagSet, ex *Explicit) error {
-	specs := allSpecs(f, ex)
+// checkExplicitFlags prints deprecation warnings for explicitly-set deprecated flags.
+func checkExplicitFlags(fs *flag.FlagSet, f *Flags) error {
+	specs := allSpecs(f)
 	registry := make(map[string]OptionSpec, len(specs)*2)
 	for _, spec := range specs {
 		for _, name := range spec.Names {
@@ -113,7 +109,6 @@ func (f *Flags) CheckExplicitFlags(fs *flag.FlagSet, ex *Explicit) error {
 			if spec.Deprecated != "" {
 				fmt.Fprintf(color.Error, "Warning: --%s is deprecated, use %s\n", fl.Name, spec.Deprecated)
 			}
-			spec.setExplicit(ex)
 		}
 	})
 
@@ -123,8 +118,7 @@ func (f *Flags) CheckExplicitFlags(fs *flag.FlagSet, ex *Explicit) error {
 // PrintUsage prints the usage information generated from the option metadata.
 func PrintUsage() {
 	f := &Flags{}
-	ex := &Explicit{}
-	specs := allSpecs(f, ex)
+	specs := allSpecs(f)
 
 	// Collect categories and max option width.
 	categories := []string{"Display", "Verification", "Input", "Other"}

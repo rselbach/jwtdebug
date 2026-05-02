@@ -21,11 +21,9 @@ func TestInitFlags(t *testing.T) {
 	err := fs.Parse([]string{"-header", "-all"})
 	r.NoError(err)
 
-	ex := &Explicit{}
-	r.NoError(f.CheckExplicitFlags(fs, ex))
+	r.NoError(checkExplicitFlags(fs, f))
 
 	r.True(f.Header)
-	r.True(ex.Header)
 	r.True(f.ShowAll)
 }
 
@@ -64,15 +62,13 @@ func TestFlagPrecedence(t *testing.T) {
 	err := fs.Parse([]string{"-claims=false"})
 	r.NoError(err)
 
-	ex := &Explicit{}
-	r.NoError(f.CheckExplicitFlags(fs, ex))
+	r.NoError(checkExplicitFlags(fs, f))
 
 	r.False(f.Claims)
-	r.True(ex.Claims, "explicit flag should track user override")
 }
 
 func TestDeprecatedFlagWarnings(t *testing.T) {
-	t.Run("deprecated alias sets explicit flag", func(t *testing.T) {
+	t.Run("deprecated alias sets field", func(t *testing.T) {
 		r := require.New(t)
 		f := &Flags{}
 		fs := newFlagSet(t)
@@ -81,10 +77,8 @@ func TestDeprecatedFlagWarnings(t *testing.T) {
 		err := fs.Parse([]string{"-key", "somefile"})
 		r.NoError(err)
 
-		ex := &Explicit{}
-		r.NoError(f.CheckExplicitFlags(fs, ex))
+		r.NoError(checkExplicitFlags(fs, f))
 
-		r.True(ex.KeyFile)
 		r.Equal("somefile", f.KeyFile)
 	})
 

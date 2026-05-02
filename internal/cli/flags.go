@@ -12,57 +12,41 @@ var (
 	BuildDate = "unknown"
 )
 
-// Options holds runtime settings.
-type Options struct {
+// Flags holds all CLI flag values
+type Flags struct {
 	KeyFile          string
 	Header           bool
 	Claims           bool
 	Signature        bool
 	Expiration       bool
 	IgnoreExpiration bool
+	VerifySignature  bool
+	ShowAll          bool
+	ShowVersion      bool
+	Quiet            bool
+	Verbose          bool
+	RawClaims        bool
+	ShowHelp         bool
+	Strict           bool
 }
 
-// Flags holds all CLI flag values
-type Flags struct {
-	Options
-	VerifySignature bool
-	ShowAll         bool
-	ShowVersion     bool
-	Quiet           bool
-	Verbose         bool
-	RawClaims       bool
-	ShowHelp        bool
-	Strict          bool
-}
-
-// Explicit tracks which flags were explicitly set by the user
-type Explicit struct {
-	Header           bool
-	Claims           bool
-	Signature        bool
-	KeyFile          bool
-	Expiration       bool
-	IgnoreExpiration bool
-}
-
-// Parse parses command-line arguments into Flags, Explicit tracking, and remaining positional arguments.
-func Parse(args []string) (*Flags, *Explicit, []string, error) {
+// Parse parses command-line arguments into Flags and remaining positional arguments.
+func Parse(args []string) (*Flags, []string, error) {
 	f := &Flags{}
-	ex := &Explicit{}
 	fs := flag.NewFlagSet("jwtdebug", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
 	InitFlags(fs, f)
 
 	if err := fs.Parse(args); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	if err := f.CheckExplicitFlags(fs, ex); err != nil {
-		return nil, nil, nil, err
+	if err := checkExplicitFlags(fs, f); err != nil {
+		return nil, nil, err
 	}
 
-	return f, ex, fs.Args(), nil
+	return f, fs.Args(), nil
 }
 
 // ApplyAllFlag enables all output options if the -all flag is set
