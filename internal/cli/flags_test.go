@@ -12,41 +12,13 @@ func newFlagSet(t *testing.T) *flag.FlagSet {
 	return flag.NewFlagSet("test", flag.ContinueOnError)
 }
 
-func TestValidateFormat(t *testing.T) {
-	tests := map[string]struct {
-		input   string
-		wantErr bool
-	}{
-		"pretty": {input: "pretty", wantErr: false},
-		"json":   {input: "json", wantErr: false},
-		"raw":    {input: "raw", wantErr: false},
-		"xml":    {input: "xml", wantErr: true},
-		"yaml":   {input: "yaml", wantErr: true},
-		"empty":  {input: "", wantErr: true},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			r := require.New(t)
-			err := validateFormat(tc.input)
-			if tc.wantErr {
-				r.Error(err)
-				r.Contains(err.Error(), "invalid format")
-			} else {
-				r.NoError(err)
-			}
-		})
-	}
-}
-
 func TestInitFlags(t *testing.T) {
 	r := require.New(t)
 	f := &Flags{}
 	fs := newFlagSet(t)
 	InitFlags(fs, f)
 
-	// Use -format (deprecated alias) to verify it still works and sets explicit flag
-	err := fs.Parse([]string{"-header", "-format", "json", "-all"})
+	err := fs.Parse([]string{"-header", "-all"})
 	r.NoError(err)
 
 	ex := &Explicit{}
@@ -54,8 +26,6 @@ func TestInitFlags(t *testing.T) {
 
 	r.True(f.Header)
 	r.True(ex.Header)
-	r.Equal("json", f.Format)
-	r.True(ex.Format)
 	r.True(f.ShowAll)
 }
 
@@ -133,9 +103,7 @@ func TestDeprecatedFlagWarnings(t *testing.T) {
 		}
 
 		r.Equal("--key-file", findSpec("key").Deprecated)
-		r.Equal("--output", findSpec("format").Deprecated)
 		r.Equal("--expiration", findSpec("expiry").Deprecated)
-		r.Equal("--decode-signature", findSpec("decode-sig").Deprecated)
 		r.Equal("--ignore-expiration", findSpec("ignore-exp").Deprecated)
 	})
 
@@ -156,6 +124,6 @@ func TestDeprecatedFlagWarnings(t *testing.T) {
 		r.Empty(findSpec("header").Deprecated)
 		r.Empty(findSpec("claims").Deprecated)
 		r.Empty(findSpec("key-file").Deprecated)
-		r.Empty(findSpec("output").Deprecated)
+		r.Empty(findSpec("verify").Deprecated)
 	})
 }

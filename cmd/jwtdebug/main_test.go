@@ -86,7 +86,7 @@ func TestRunDecodeBasic(t *testing.T) {
 		"role": "student",
 	}, key)
 
-	code := runWithArgs([]string{"--no-color", "--claims", token})
+	code := runWithArgs([]string{"--claims", token})
 	r.Equal(0, code)
 }
 
@@ -101,7 +101,7 @@ func TestRunDecodeRawClaims(t *testing.T) {
 	}, key)
 
 	output := captureStdout(t, func() {
-		code := runWithArgs([]string{"--no-color", "--raw-claims", token})
+		code := runWithArgs([]string{"--raw-claims", token})
 		r.Equal(0, code)
 	})
 	r.Contains(output, `"sub": "Abed Nadir"`)
@@ -124,7 +124,7 @@ func TestRunVerifySignature(t *testing.T) {
 	r.NoError(err)
 	keyFile.Close()
 
-	code := runWithArgs([]string{"--no-color", "--verify", "--key-file", keyFile.Name(), token})
+	code := runWithArgs([]string{"--verify", "--key-file", keyFile.Name(), token})
 	r.Equal(0, code)
 }
 
@@ -146,7 +146,7 @@ func TestRunVerifyInvalidSignature(t *testing.T) {
 	r.NoError(err)
 	wrongKeyFile.Close()
 
-	code := runWithArgs([]string{"--no-color", "--verify", "--key-file", wrongKeyFile.Name(), token})
+	code := runWithArgs([]string{"--verify", "--key-file", wrongKeyFile.Name(), token})
 	r.Equal(3, code, "Expected verification failure exit code")
 }
 
@@ -154,7 +154,7 @@ func TestRunNoTokenShowsHelp(t *testing.T) {
 	r := require.New(t)
 
 	stderr := captureStderr(t, func() {
-		code := runWithArgs([]string{"--no-color"})
+		code := runWithArgs([]string{})
 		r.Equal(1, code, "Expected general error exit code for no token")
 	})
 	r.Contains(stderr, "no token provided")
@@ -163,7 +163,7 @@ func TestRunNoTokenShowsHelp(t *testing.T) {
 func TestRunInvalidToken(t *testing.T) {
 	r := require.New(t)
 
-	code := runWithArgs([]string{"--no-color", "not-a-valid-token"})
+	code := runWithArgs([]string{"not-a-valid-token"})
 	r.Equal(2, code, "Expected invalid token exit code")
 }
 
@@ -192,33 +192,11 @@ func TestRunExpirationCheck(t *testing.T) {
 	}, key)
 
 	// Both should exit 0 regardless of expiration status — expiration is informational
-	code := runWithArgs([]string{"--no-color", "--expiration", "--claims=false", expiredToken})
+	code := runWithArgs([]string{"--expiration", "--claims=false", expiredToken})
 	r.Equal(0, code)
 
-	code = runWithArgs([]string{"--no-color", "--expiration", "--claims=false", validToken})
+	code = runWithArgs([]string{"--expiration", "--claims=false", validToken})
 	r.Equal(0, code)
-}
-
-func TestRunOutputFormats(t *testing.T) {
-	key := "test-secret-key-at-least-32-bytes-long!"
-	now := time.Now()
-	token := testToken(t, jwt.MapClaims{
-		"sub": "Jeff Winger",
-		"exp": now.Add(time.Hour).Unix(),
-	}, key)
-
-	formats := []string{"pretty", "json", "raw"}
-	for _, format := range formats {
-		t.Run(format, func(t *testing.T) {
-			r := require.New(t)
-
-			output := captureStdout(t, func() {
-				code := runWithArgs([]string{"--no-color", "--output", format, "--claims", token})
-				r.Equal(0, code)
-			})
-			r.Contains(output, "Jeff Winger")
-		})
-	}
 }
 
 func TestRunSmartExtraction(t *testing.T) {
@@ -232,7 +210,7 @@ func TestRunSmartExtraction(t *testing.T) {
 	}, key)
 
 	output := captureStdout(t, func() {
-		code := runWithArgs([]string{"--no-color", "--claims", "Bearer " + token})
+		code := runWithArgs([]string{"--claims", "Bearer " + token})
 		r.Equal(0, code)
 	})
 	r.Contains(output, "Pierce Hawthorne")
@@ -248,7 +226,7 @@ func TestRunStrictModeRejectsBearer(t *testing.T) {
 		"exp": now.Add(time.Hour).Unix(),
 	}, key)
 
-	code := runWithArgs([]string{"--no-color", "--strict", "Bearer " + token})
+	code := runWithArgs([]string{"--strict", "Bearer " + token})
 	r.Equal(2, code, "Strict mode should reject Bearer prefix")
 }
 

@@ -10,8 +10,6 @@ import (
 	"github.com/fatih/color"
 
 	"github.com/rselbach/jwtdebug/internal/cli"
-	"github.com/rselbach/jwtdebug/internal/completions"
-	"github.com/rselbach/jwtdebug/internal/config"
 	"github.com/rselbach/jwtdebug/internal/constants"
 	"github.com/rselbach/jwtdebug/internal/parser"
 	"github.com/rselbach/jwtdebug/internal/printer"
@@ -27,7 +25,7 @@ func run() int {
 }
 
 func runWithArgs(args []string) int {
-	f, ex, positionalArgs, err := cli.Parse(args)
+	f, _, positionalArgs, err := cli.Parse(args)
 	if err != nil {
 		fmt.Fprintf(color.Error, "Error: %v\n", err)
 		return constants.ExitError
@@ -37,22 +35,7 @@ func runWithArgs(args []string) int {
 		return exitCode
 	}
 
-	if exitCode, handled := handleCompletion(f); handled {
-		return exitCode
-	}
-
-	cfg, exitCode := loadConfig(f, ex)
-	if exitCode != constants.ExitSuccess {
-		return exitCode
-	}
-
-	f.ApplyColorSettings()
-
 	f.ApplyAllFlag()
-
-	if exitCode, handled := handleSaveConfig(cfg, f, positionalArgs); handled {
-		return exitCode
-	}
 
 	return processInputTokens(f, positionalArgs)
 }
@@ -65,46 +48,6 @@ func handleHelpVersion(f *cli.Flags) (int, bool) {
 
 	if f.ShowVersion {
 		printVersion(f)
-		return constants.ExitSuccess, true
-	}
-
-	return constants.ExitSuccess, false
-}
-
-func handleCompletion(f *cli.Flags) (int, bool) {
-	if f.CompletionShell == "" {
-		return constants.ExitSuccess, false
-	}
-
-	return generateCompletion(f.CompletionShell), true
-}
-
-func loadConfig(f *cli.Flags, ex *cli.Explicit) (*config.Config, int) {
-	cfg, err := config.LoadConfig(f.ConfigFile)
-	if err != nil {
-		fmt.Fprintf(color.Error, "Error: failed to load config: %v\n", err)
-		return nil, constants.ExitConfigError
-	}
-
-	config.ApplyConfig(cfg, f, ex)
-	return cfg, constants.ExitSuccess
-}
-
-func handleSaveConfig(cfg *config.Config, f *cli.Flags, args []string) (int, bool) {
-	if !f.SaveConfig {
-		return constants.ExitSuccess, false
-	}
-
-	config.UpdateFromCLI(cfg, f)
-
-	savePath := f.ConfigFile
-	if err := config.SaveConfig(cfg, savePath); err != nil {
-		fmt.Fprintf(color.Error, "Error: Failed to save config: %v\n", err)
-		return constants.ExitConfigError, true
-	}
-	color.Green("Configuration saved successfully.")
-
-	if len(args) == 0 {
 		return constants.ExitSuccess, true
 	}
 
@@ -141,21 +84,6 @@ func printVersion(f *cli.Flags) {
 	}
 }
 
-func generateCompletion(shell string) int {
-	switch strings.ToLower(shell) {
-	case "bash":
-		fmt.Print(completions.Bash())
-	case "zsh":
-		fmt.Print(completions.Zsh())
-	case "fish":
-		fmt.Print(completions.Fish())
-	default:
-		fmt.Fprintf(color.Error, "Error: unsupported shell %q (supported: bash, zsh, fish)\n", shell)
-		return constants.ExitError
-	}
-	return constants.ExitSuccess
-}
-
 func processToken(token string, f *cli.Flags) int {
 	parsed, err := parser.ParseToken(token)
 	if err != nil {
@@ -178,15 +106,15 @@ func processToken(token string, f *cli.Flags) int {
 	}
 
 	if f.Header {
-		printer.PrintHeader(parsed.Token, f.Format)
+		printer.PrintHeader(parsed.Token)
 	}
 
 	if f.Claims {
-		printer.PrintClaims(parsed.Token, f.Format)
+		printer.PrintClaims(parsed.Token)
 	}
 
 	if f.Signature {
-		printer.PrintSignature(parsed.Parts[2], f.Format, f.DecodeSignature)
+		printer.PrintSignature(parsed.Parts[2])
 	}
 
 	if f.Expiration {

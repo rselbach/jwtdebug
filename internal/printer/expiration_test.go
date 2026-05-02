@@ -7,10 +7,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/require"
 )
+
+func captureOutput(f func()) string {
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	f()
+	w.Close()
+	os.Stdout = oldStdout
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	return buf.String()
+}
 
 func TestTryParseTimestamp_StringEpoch(t *testing.T) {
 	r := require.New(t)
@@ -33,29 +44,6 @@ func TestTryParseTimestamp_OutOfRange(t *testing.T) {
 	r := require.New(t)
 	got, ok := tryParseTimestamp(int64(100))
 	r.False(ok, "expected ok=false for out-of-range timestamp, got %v", got)
-}
-
-func captureOutput(f func()) string {
-	oldNoColor := color.NoColor
-	color.NoColor = true
-	defer func() { color.NoColor = oldNoColor }()
-
-	oldStdout := os.Stdout
-	oldColorOutput := color.Output
-
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	color.Output = w
-
-	f()
-
-	w.Close()
-	os.Stdout = oldStdout
-	color.Output = oldColorOutput
-
-	var buf bytes.Buffer
-	io.Copy(&buf, r)
-	return buf.String()
 }
 
 func TestCheckExpiration(t *testing.T) {
