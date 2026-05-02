@@ -40,46 +40,43 @@ func CheckExpiration(token *jwt.Token) {
 
 	now := time.Now().Unix()
 
-	// exp
-	if v, exists := claims["exp"]; exists {
-		if t, ok := tryParseTimestamp(v); ok {
-			expUnix := t.Unix()
-			expTimeFormatted := t.Format(time.RFC3339)
-			if now > expUnix {
-				color.Red("✗ Token expired at %s (%.0f seconds ago)", expTimeFormatted, float64(now-expUnix))
-			} else {
-				color.Green("✓ Token expires at %s (%.0f seconds from now)", expTimeFormatted, float64(expUnix-now))
-			}
+	printTimeClaim("exp", claims, func(t time.Time) {
+		expUnix := t.Unix()
+		if now > expUnix {
+			color.Red("✗ Token expired at %s (%.0f seconds ago)", t.Format(time.RFC3339), float64(now-expUnix))
 		} else {
-			fmt.Printf("Unrecognized expiration value: %v\n", v)
+			color.Green("✓ Token expires at %s (%.0f seconds from now)", t.Format(time.RFC3339), float64(expUnix-now))
 		}
-	} else {
+	}, func() {
 		fmt.Println("No expiration claim found")
-	}
+	})
 
-	// nbf
-	if v, exists := claims["nbf"]; exists {
-		if t, ok := tryParseTimestamp(v); ok {
-			nbfUnix := t.Unix()
-			nbfTimeFormatted := t.Format(time.RFC3339)
-			if now < nbfUnix {
-				color.Yellow("⚠ Token not valid yet. Valid from %s (in %.0f seconds)", nbfTimeFormatted, float64(nbfUnix-now))
-			} else {
-				color.Green("✓ Token valid since %s (%.0f seconds ago)", nbfTimeFormatted, float64(now-nbfUnix))
-			}
+	printTimeClaim("nbf", claims, func(t time.Time) {
+		nbfUnix := t.Unix()
+		if now < nbfUnix {
+			color.Yellow("⚠ Token not valid yet. Valid from %s (in %.0f seconds)", t.Format(time.RFC3339), float64(nbfUnix-now))
 		} else {
-			fmt.Println("Unrecognized notBefore value")
+			color.Green("✓ Token valid since %s (%.0f seconds ago)", t.Format(time.RFC3339), float64(now-nbfUnix))
 		}
-	}
+	}, nil)
 
-	// iat
-	if v, exists := claims["iat"]; exists {
-		if t, ok := tryParseTimestamp(v); ok {
-			fmt.Printf("Issued at: %s (%.0f seconds ago)\n", t.Format(time.RFC3339), float64(now-t.Unix()))
-		} else {
-			fmt.Println("Unrecognized issuedAt value")
-		}
-	}
+	printTimeClaim("iat", claims, func(t time.Time) {
+		fmt.Printf("Issued at: %s (%.0f seconds ago)\n", t.Format(time.RFC3339), float64(now-t.Unix()))
+	}, nil)
 
 	fmt.Println()
+}
+
+func printTimeClaim(name string, claims jwt.MapClaims, onFound func(time.Time), onMissing func()) {
+	if v, exists := claims[name]; exists {
+		if t, ok := tryParseTimestamp(v); ok {
+			onFound(t)
+			return
+		}
+		fmt.Printf("Unrecognized %s value: %v\n", name, v)
+		return
+	}
+	if onMissing != nil {
+		onMissing()
+	}
 }

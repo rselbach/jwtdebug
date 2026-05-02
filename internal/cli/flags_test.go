@@ -7,12 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func resetFlags(t *testing.T) *Flags {
+func newFlagSet(t *testing.T) *flag.FlagSet {
 	t.Helper()
-	old := flag.CommandLine
-	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
-	t.Cleanup(func() { flag.CommandLine = old })
-	return &Flags{}
+	return flag.NewFlagSet("test", flag.ContinueOnError)
 }
 
 func TestValidateFormat(t *testing.T) {
@@ -44,19 +41,20 @@ func TestValidateFormat(t *testing.T) {
 
 func TestInitFlags(t *testing.T) {
 	r := require.New(t)
-	f := resetFlags(t)
-	InitFlags(f)
+	f := &Flags{}
+	fs := newFlagSet(t)
+	InitFlags(fs, f)
 
 	// Use -format (deprecated alias) to verify it still works and sets explicit flag
-	err := flag.CommandLine.Parse([]string{"-header", "-format", "json", "-all"})
+	err := fs.Parse([]string{"-header", "-format", "json", "-all"})
 	r.NoError(err)
 
 	ex := &Explicit{}
-	r.NoError(f.CheckExplicitFlags(ex))
+	r.NoError(f.CheckExplicitFlags(fs, ex))
 
-	r.True(f.WithHeader)
+	r.True(f.Header)
 	r.True(ex.Header)
-	r.Equal("json", f.OutputFormat)
+	r.Equal("json", f.Format)
 	r.True(ex.Format)
 	r.True(f.ShowAll)
 }
@@ -64,76 +62,100 @@ func TestInitFlags(t *testing.T) {
 func TestApplyAllFlag(t *testing.T) {
 	t.Run("all flag enables everything", func(t *testing.T) {
 		r := require.New(t)
-		f := resetFlags(t)
+		f := &Flags{}
 		f.ShowAll = true
 		f.ApplyAllFlag()
 
-		r.True(f.WithHeader)
-		r.True(f.WithClaims)
-		r.True(f.WithSignature)
-		r.True(f.ShowExpiration)
+		r.True(f.Header)
+		r.True(f.Claims)
+		r.True(f.Signature)
+		r.True(f.Expiration)
 	})
 
 	t.Run("without all flag nothing changes", func(t *testing.T) {
 		r := require.New(t)
-		f := resetFlags(t)
+		f := &Flags{}
 		f.ShowAll = false
 		f.ApplyAllFlag()
 
-		r.False(f.WithHeader)
-		r.False(f.WithClaims)
-		r.False(f.WithSignature)
-		r.False(f.ShowExpiration)
+		r.False(f.Header)
+		r.False(f.Claims)
+		r.False(f.Signature)
+		r.False(f.Expiration)
 	})
 }
 
 func TestFlagPrecedence(t *testing.T) {
 	r := require.New(t)
-	f := resetFlags(t)
-	InitFlags(f)
+	f := &Flags{}
+	fs := newFlagSet(t)
+	InitFlags(fs, f)
 
-	err := flag.CommandLine.Parse([]string{"-claims=false"})
+	err := fs.Parse([]string{"-claims=false"})
 	r.NoError(err)
 
 	ex := &Explicit{}
-	r.NoError(f.CheckExplicitFlags(ex))
+	r.NoError(f.CheckExplicitFlags(fs, ex))
 
-	r.False(f.WithClaims)
+	r.False(f.Claims)
 	r.True(ex.Claims, "explicit flag should track user override")
 }
 
 func TestDeprecatedFlagWarnings(t *testing.T) {
 	t.Run("deprecated alias sets explicit flag", func(t *testing.T) {
 		r := require.New(t)
-		f := resetFlags(t)
-		InitFlags(f)
+		f := &Flags{}
+		fs := newFlagSet(t)
+		InitFlags(fs, f)
 
-		err := flag.CommandLine.Parse([]string{"-key", "somefile"})
+		err := fs.Parse([]string{"-key", "somefile"})
 		r.NoError(err)
 
 		ex := &Explicit{}
-		r.NoError(f.CheckExplicitFlags(ex))
+		r.NoError(f.CheckExplicitFlags(fs, ex))
 
 		r.True(ex.KeyFile)
 		r.Equal("somefile", f.KeyFile)
 	})
 
-	t.Run("deprecated aliases have replacement hints in registry", func(t *testing.T) {
+	t.Run("deprecated aliases have replacement hints in specs", func(t *testing.T) {
 		r := require.New(t)
 
-		r.Equal("--key-file", flagRegistry["key"].deprecatedRepl)
-		r.Equal("--output", flagRegistry["format"].deprecatedRepl)
-		r.Equal("--expiration", flagRegistry["expiry"].deprecatedRepl)
-		r.Equal("--decode-signature", flagRegistry["decode-sig"].deprecatedRepl)
-		r.Equal("--ignore-expiration", flagRegistry["ignore-exp"].deprecatedRepl)
+		findSpec := func(name string) *OptionSpec {
+			for _, spec := range AllOptionSpecs() {
+				for _, n := range spec.Names {
+					if n == name {
+						return &spec
+					}
+				}
+			}
+			return nil
+		}
+
+		r.Equal("--key-file", findSpec("key").Deprecated)
+		r.Equal("--output", findSpec("format").Deprecated)
+		r.Equal("--expiration", findSpec("expiry").Deprecated)
+		r.Equal("--decode-signature", findSpec("decode-sig").Deprecated)
+		r.Equal("--ignore-expiration", findSpec("ignore-exp").Deprecated)
 	})
 
 	t.Run("non-deprecated flags have empty replacement", func(t *testing.T) {
 		r := require.New(t)
 
-		r.Empty(flagRegistry["header"].deprecatedRepl)
-		r.Empty(flagRegistry["claims"].deprecatedRepl)
-		r.Empty(flagRegistry["key-file"].deprecatedRepl)
-		r.Empty(flagRegistry["output"].deprecatedRepl)
+		findSpec := func(name string) *OptionSpec {
+			for _, spec := range AllOptionSpecs() {
+				for _, n := range spec.Names {
+					if n == name {
+						return &spec
+					}
+				}
+			}
+			return nil
+		}
+
+		r.Empty(findSpec("header").Deprecated)
+		r.Empty(findSpec("claims").Deprecated)
+		r.Empty(findSpec("key-file").Deprecated)
+		r.Empty(findSpec("output").Deprecated)
 	})
 }

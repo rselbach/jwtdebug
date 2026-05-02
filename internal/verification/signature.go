@@ -10,7 +10,7 @@ import (
 	"github.com/rselbach/jwtdebug/internal/constants"
 )
 
-var validAlgorithms = []string{"HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA"}
+var validAlgorithms []string
 
 type keyParser func([]byte) (any, error)
 
@@ -28,6 +28,12 @@ var keyParsers = map[string]keyParser{
 	"ES384": parseECPublicKey,
 	"ES512": parseECPublicKey,
 	"EdDSA": parseEdPublicKey,
+}
+
+func init() {
+	for alg := range keyParsers {
+		validAlgorithms = append(validAlgorithms, alg)
+	}
 }
 
 const minHMACKeyLen = 32

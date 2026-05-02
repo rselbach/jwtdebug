@@ -2,7 +2,7 @@ package main
 
 import (
 	"bufio"
-	"flag"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -14,6 +14,8 @@ import (
 	"github.com/rselbach/jwtdebug/internal/config"
 	"github.com/rselbach/jwtdebug/internal/constants"
 	"github.com/rselbach/jwtdebug/internal/parser"
+	"github.com/rselbach/jwtdebug/internal/printer"
+	"github.com/rselbach/jwtdebug/internal/verification"
 )
 
 func main() {
@@ -21,13 +23,12 @@ func main() {
 }
 
 func run() int {
-	f := &cli.Flags{}
-	ex := &cli.Explicit{}
+	return runWithArgs(os.Args[1:])
+}
 
-	cli.InitFlags(f)
-	flag.Parse()
-
-	if err := f.CheckExplicitFlags(ex); err != nil {
+func runWithArgs(args []string) int {
+	f, ex, positionalArgs, err := cli.Parse(args)
+	if err != nil {
 		fmt.Fprintf(color.Error, "Error: %v\n", err)
 		return constants.ExitError
 	}
@@ -49,11 +50,11 @@ func run() int {
 
 	f.ApplyAllFlag()
 
-	if exitCode, handled := handleSaveConfig(cfg, f); handled {
+	if exitCode, handled := handleSaveConfig(cfg, f, positionalArgs); handled {
 		return exitCode
 	}
 
-	return processInputTokens(f)
+	return processInputTokens(f, positionalArgs)
 }
 
 func handleHelpVersion(f *cli.Flags) (int, bool) {
@@ -89,7 +90,7 @@ func loadConfig(f *cli.Flags, ex *cli.Explicit) (*config.Config, int) {
 	return cfg, constants.ExitSuccess
 }
 
-func handleSaveConfig(cfg *config.Config, f *cli.Flags) (int, bool) {
+func handleSaveConfig(cfg *config.Config, f *cli.Flags, args []string) (int, bool) {
 	if !f.SaveConfig {
 		return constants.ExitSuccess, false
 	}
@@ -103,25 +104,25 @@ func handleSaveConfig(cfg *config.Config, f *cli.Flags) (int, bool) {
 	}
 	color.Green("Configuration saved successfully.")
 
-	if flag.NArg() == 0 {
+	if len(args) == 0 {
 		return constants.ExitSuccess, true
 	}
 
 	return constants.ExitSuccess, false
 }
 
-func processInputTokens(f *cli.Flags) int {
-	argCount := flag.NArg()
+func processInputTokens(f *cli.Flags, args []string) int {
+	argCount := len(args)
 
 	if argCount == 0 {
 		return processFromStdin(f, false)
 	}
 
-	if argCount == 1 && flag.Arg(0) == "-" {
+	if argCount == 1 && args[0] == "-" {
 		return processFromStdin(f, true)
 	}
 
-	for _, token := range flag.Args() {
+	for _, token := range args {
 		token = parser.NormalizeTokenString(token, f.Strict)
 		exitCode := processToken(token, f)
 		if exitCode != constants.ExitSuccess {
@@ -156,12 +157,51 @@ func generateCompletion(shell string) int {
 }
 
 func processToken(token string, f *cli.Flags) int {
-	result := parser.ProcessToken(token, f)
-	if result.Err != nil {
-		fmt.Fprintf(color.Error, "Error: %v\n", result.Err)
-		return result.ExitCode
+	parsed, err := parser.ParseToken(token)
+	if err != nil {
+		fmt.Fprintf(color.Error, "Error: %v\n", err)
+		return constants.ExitInvalidToken
 	}
-	return result.ExitCode
+
+	if f.RawClaims {
+		data, err := json.MarshalIndent(parsed.Claims, "", "  ")
+		if err != nil {
+			fmt.Fprintf(color.Error, "Error: failed to encode claims as JSON: %v\n", err)
+			return constants.ExitError
+		}
+		fmt.Println(string(data))
+		return constants.ExitSuccess
+	}
+
+	if !f.VerifySignature {
+		printer.PrintUnverifiedNotice(f.Quiet)
+	}
+
+	if f.Header {
+		printer.PrintHeader(parsed.Token, f.Format)
+	}
+
+	if f.Claims {
+		printer.PrintClaims(parsed.Token, f.Format)
+	}
+
+	if f.Signature {
+		printer.PrintSignature(parsed.Parts[2], f.Format, f.DecodeSignature)
+	}
+
+	if f.Expiration {
+		printer.CheckExpiration(parsed.Token)
+	}
+
+	if f.VerifySignature {
+		if err := verification.VerifyTokenSignature(token, f.KeyFile, f.IgnoreExpiration); err != nil {
+			printer.PrintVerificationFailure(err)
+			return constants.ExitVerificationFail
+		}
+		printer.PrintVerificationSuccess()
+	}
+
+	return constants.ExitSuccess
 }
 
 func isTerminal() bool {
@@ -184,11 +224,6 @@ func printUsageHint() {
 
 func processFromStdin(f *cli.Flags, explicit bool) int {
 	if isTerminal() {
-		if explicit {
-			if !f.Quiet {
-				fmt.Fprintln(color.Error, "Reading token from stdin... (press Ctrl+D when done)")
-			}
-		}
 		if !explicit {
 			printUsageHint()
 			return constants.ExitError

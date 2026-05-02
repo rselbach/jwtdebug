@@ -33,37 +33,40 @@ func formatClaimValue(value any, tryTimestamp bool) string {
 	return formatValue(value)
 }
 
-func isStandardTimestampClaim(name string) bool {
-	return name == "exp" || name == "nbf" || name == "iat"
+type claimMeta struct {
+	name        string
+	label       string
+	isTimestamp bool
+}
+
+var standardClaims = []claimMeta{
+	{"iss", "Issuer", false},
+	{"sub", "Subject", false},
+	{"aud", "Audience", false},
+	{"exp", "Expiration", true},
+	{"nbf", "Not Before", true},
+	{"iat", "Issued At", true},
+	{"jti", "JWT ID", false},
 }
 
 func printPrettyClaims(claims jwt.MapClaims) {
-	standardClaims := map[string]string{
-		"sub": "Subject",
-		"iss": "Issuer",
-		"aud": "Audience",
-		"exp": "Expiration",
-		"nbf": "Not Before",
-		"iat": "Issued At",
-		"jti": "JWT ID",
-	}
-
-	standardOrder := []string{"iss", "sub", "aud", "exp", "nbf", "iat", "jti"}
-
 	// Build standard lines and collect all keys for max length calculation.
 	var standardLines [][2]string
 	allKeys := make([]string, 0, len(claims))
-	for _, key := range standardOrder {
-		if val, ok := claims[key]; ok {
-			displayKey := standardClaims[key]
-			standardLines = append(standardLines, [2]string{displayKey, formatClaimValue(val, isStandardTimestampClaim(key))})
-			allKeys = append(allKeys, displayKey)
+	for _, meta := range standardClaims {
+		if val, ok := claims[meta.name]; ok {
+			standardLines = append(standardLines, [2]string{meta.label, formatClaimValue(val, meta.isTimestamp)})
+			allKeys = append(allKeys, meta.label)
 		}
 	}
 
 	var customKeys []string
+	standardSet := make(map[string]bool, len(standardClaims))
+	for _, meta := range standardClaims {
+		standardSet[meta.name] = true
+	}
 	for key := range claims {
-		if _, ok := standardClaims[key]; !ok {
+		if !standardSet[key] {
 			customKeys = append(customKeys, key)
 			allKeys = append(allKeys, key)
 		}

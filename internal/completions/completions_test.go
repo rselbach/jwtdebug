@@ -1,36 +1,27 @@
 package completions
 
 import (
-	"strings"
 	"testing"
 
+	"github.com/rselbach/jwtdebug/internal/cli"
 	"github.com/stretchr/testify/require"
 )
-
-// Known CLI flags that should appear in completion scripts.
-var knownFlags = []string{
-	"--header", "--claims", "--signature", "--verify", "--key-file",
-	"--output", "--color", "--no-color", "--expiration", "--all",
-	"--decode-signature", "--ignore-expiration", "--config", "--save-config",
-	"--version", "--quiet", "--verbose", "--raw-claims", "--help",
-	"--strict",
-}
-
-// fishFlags are the long-form flags expected in fish completions (uses -l prefix).
-var fishKnownFlags = []string{
-	"-l header", "-l claims", "-l signature", "-l verify", "-l key-file",
-	"-l output", "-l color", "-l no-color", "-l expiration", "-l all",
-	"-l decode-signature", "-l ignore-expiration", "-l config", "-l save-config",
-	"-l version", "-l quiet", "-l verbose", "-l raw-claims", "-l help",
-	"-l strict",
-}
 
 func TestBashCompletionContainsAllFlags(t *testing.T) {
 	r := require.New(t)
 	script := Bash()
 
-	for _, flag := range knownFlags {
-		r.Contains(script, flag, "bash completion missing flag: %s", flag)
+	for _, spec := range cli.AllOptionSpecs() {
+		if spec.Deprecated != "" {
+			continue
+		}
+		for _, name := range spec.Names {
+			if len(name) == 1 {
+				r.Contains(script, "-"+name, "bash completion missing flag: -%s", name)
+			} else {
+				r.Contains(script, "--"+name, "bash completion missing flag: --%s", name)
+			}
+		}
 	}
 }
 
@@ -38,8 +29,17 @@ func TestZshCompletionContainsAllFlags(t *testing.T) {
 	r := require.New(t)
 	script := Zsh()
 
-	for _, flag := range knownFlags {
-		r.Contains(script, flag, "zsh completion missing flag: %s", flag)
+	for _, spec := range cli.AllOptionSpecs() {
+		if spec.Deprecated != "" {
+			continue
+		}
+		for _, name := range spec.Names {
+			if len(name) == 1 {
+				r.Contains(script, "-"+name, "zsh completion missing flag: -%s", name)
+			} else {
+				r.Contains(script, "--"+name, "zsh completion missing flag: --%s", name)
+			}
+		}
 	}
 }
 
@@ -47,19 +47,38 @@ func TestFishCompletionContainsAllFlags(t *testing.T) {
 	r := require.New(t)
 	script := Fish()
 
-	for _, flag := range fishKnownFlags {
-		r.Contains(script, flag, "fish completion missing flag: %s", flag)
+	for _, spec := range cli.AllOptionSpecs() {
+		if spec.Deprecated != "" {
+			continue
+		}
+		for _, name := range spec.Names {
+			if len(name) == 1 {
+				r.Contains(script, "-s "+name, "fish completion missing flag: -%s", name)
+			} else {
+				r.Contains(script, "-l "+name, "fish completion missing flag: --%s", name)
+			}
+		}
 	}
 }
 
 func TestCompletionScriptsNotContainsDeprecatedFlags(t *testing.T) {
 	r := require.New(t)
 
-	deprecated := []string{"--key ", "--format ", "--expiry ", "--decode-sig ", "--ignore-exp "}
-
-	for _, script := range []string{Bash(), Zsh(), Fish()} {
-		for _, dep := range deprecated {
-			r.NotContains(script, dep, "completion script should not list deprecated flag: %s", strings.TrimSpace(dep))
+	for _, spec := range cli.AllOptionSpecs() {
+		if spec.Deprecated == "" {
+			continue
+		}
+		for _, script := range []string{Bash(), Zsh(), Fish()} {
+			for _, name := range spec.Names {
+				var flagRef string
+				if len(name) == 1 {
+					flagRef = "-" + name
+				} else {
+					flagRef = "--" + name
+				}
+				// Look for the flag followed by a word boundary (space, quote, or paren)
+				r.NotContains(script, flagRef+" ", "completion script should not list deprecated flag: %s", flagRef)
+			}
 		}
 	}
 }

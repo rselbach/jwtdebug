@@ -3,18 +3,10 @@ package parser
 import (
 	"testing"
 
-	"github.com/rselbach/jwtdebug/internal/cli"
 	"github.com/stretchr/testify/require"
 )
 
-func defaultFlags() *cli.Flags {
-	return &cli.Flags{
-		WithClaims:   true,
-		OutputFormat: "pretty",
-	}
-}
-
-func TestProcessToken(t *testing.T) {
+func TestParseToken(t *testing.T) {
 	tests := map[string]struct {
 		token        string
 		shouldFail   bool
@@ -51,18 +43,23 @@ func TestProcessToken(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
-			f := defaultFlags()
-			result := ProcessToken(tc.token, f)
+			parsed, err := ParseToken(tc.token)
 
 			if tc.token == "" {
-				r.NotNil(result.Err, "Expected an error for empty token")
+				r.NotNil(err, "Expected an error for empty token")
+				r.Nil(parsed)
 				return
 			}
 
 			if tc.shouldFail {
-				r.NotNil(result.Err, "Expected an error for token: %s", tc.token)
+				r.NotNil(err, "Expected an error for token: %s", tc.token)
+				r.Nil(parsed)
+				if tc.errorMessage != "" {
+					r.Contains(err.Error(), tc.errorMessage)
+				}
 			} else {
-				r.Nil(result.Err, "Did not expect an error for valid token")
+				r.NoError(err, "Did not expect an error for valid token")
+				r.NotNil(parsed)
 			}
 		})
 	}

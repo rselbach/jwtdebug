@@ -19,15 +19,17 @@ func TestLoadSaveConfig(t *testing.T) {
 	configPath := filepath.Join(tempDir, "config.json")
 
 	testConfig := &Config{
-		DefaultFormat:    "json",
-		ColorEnabled:     true,
-		DefaultKeyFile:   "/path/to/key",
-		ShowHeader:       true,
-		ShowClaims:       true,
-		ShowSignature:    true,
-		ShowExpiration:   true,
-		DecodeSignature:  true,
-		IgnoreExpiration: false,
+		Options: cli.Options{
+			Format:           "json",
+			Color:            true,
+			KeyFile:          "/path/to/key",
+			Header:           true,
+			Claims:           true,
+			Signature:        true,
+			Expiration:       true,
+			DecodeSignature:  true,
+			IgnoreExpiration: false,
+		},
 	}
 
 	err = SaveConfig(testConfig, configPath)
@@ -36,13 +38,13 @@ func TestLoadSaveConfig(t *testing.T) {
 	loadedConfig, err := LoadConfig(configPath)
 	r.NoError(err, "Should load config without error")
 
-	r.Equal(testConfig.DefaultFormat, loadedConfig.DefaultFormat)
-	r.Equal(testConfig.ColorEnabled, loadedConfig.ColorEnabled)
-	r.Equal(testConfig.DefaultKeyFile, loadedConfig.DefaultKeyFile)
-	r.Equal(testConfig.ShowHeader, loadedConfig.ShowHeader)
-	r.Equal(testConfig.ShowClaims, loadedConfig.ShowClaims)
-	r.Equal(testConfig.ShowSignature, loadedConfig.ShowSignature)
-	r.Equal(testConfig.ShowExpiration, loadedConfig.ShowExpiration)
+	r.Equal(testConfig.Format, loadedConfig.Format)
+	r.Equal(testConfig.Color, loadedConfig.Color)
+	r.Equal(testConfig.KeyFile, loadedConfig.KeyFile)
+	r.Equal(testConfig.Header, loadedConfig.Header)
+	r.Equal(testConfig.Claims, loadedConfig.Claims)
+	r.Equal(testConfig.Signature, loadedConfig.Signature)
+	r.Equal(testConfig.Expiration, loadedConfig.Expiration)
 	r.Equal(testConfig.DecodeSignature, loadedConfig.DecodeSignature)
 	r.Equal(testConfig.IgnoreExpiration, loadedConfig.IgnoreExpiration)
 }
@@ -58,22 +60,24 @@ func TestApplyConfig(t *testing.T) {
 	r := require.New(t)
 
 	testConfig := &Config{
-		DefaultFormat:    "json",
-		ColorEnabled:     false,
-		DefaultKeyFile:   "/path/to/key",
-		ShowHeader:       true,
-		ShowClaims:       false,
-		ShowSignature:    true,
-		ShowExpiration:   true,
-		DecodeSignature:  true,
-		IgnoreExpiration: false,
+		Options: cli.Options{
+			Format:           "json",
+			Color:            false,
+			KeyFile:          "/path/to/key",
+			Header:           true,
+			Claims:           false,
+			Signature:        true,
+			Expiration:       true,
+			DecodeSignature:  true,
+			IgnoreExpiration: false,
+		},
 	}
 
 	f := &cli.Flags{}
 	ex := &cli.Explicit{}
 	ApplyConfig(testConfig, f, ex)
 
-	r.Equal("json", f.OutputFormat)
-	r.False(f.OutputColor)
+	r.Equal("json", f.Format)
+	r.False(f.Color)
 	r.Equal("/path/to/key", f.KeyFile)
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"flag"
 	"io"
 	"os"
 	"testing"
@@ -74,21 +73,6 @@ func captureStderr(t *testing.T, f func()) string {
 	return buf.String()
 }
 
-// withArgs runs f with os.Args set to args, resetting flag.CommandLine afterwards.
-func withArgs(t *testing.T, args []string, f func()) {
-	t.Helper()
-	oldArgs := os.Args
-	oldFlagSet := flag.CommandLine
-	os.Args = args
-	// Reset the global flag set so InitFlags can re-register
-	flag.CommandLine = flag.NewFlagSet("jwtdebug", flag.ContinueOnError)
-	defer func() {
-		os.Args = oldArgs
-		flag.CommandLine = oldFlagSet
-	}()
-	f()
-}
-
 func TestRunDecodeBasic(t *testing.T) {
 	r := require.New(t)
 
@@ -102,10 +86,8 @@ func TestRunDecodeBasic(t *testing.T) {
 		"role": "student",
 	}, key)
 
-	withArgs(t, []string{"jwtdebug", "--no-color", "--claims", token}, func() {
-		code := run()
-		r.Equal(0, code)
-	})
+	code := runWithArgs([]string{"--no-color", "--claims", token})
+	r.Equal(0, code)
 }
 
 func TestRunDecodeRawClaims(t *testing.T) {
@@ -118,13 +100,11 @@ func TestRunDecodeRawClaims(t *testing.T) {
 		"exp": now.Add(time.Hour).Unix(),
 	}, key)
 
-	withArgs(t, []string{"jwtdebug", "--no-color", "--raw-claims", token}, func() {
-		output := captureStdout(t, func() {
-			code := run()
-			r.Equal(0, code)
-		})
-		r.Contains(output, `"sub": "Abed Nadir"`)
+	output := captureStdout(t, func() {
+		code := runWithArgs([]string{"--no-color", "--raw-claims", token})
+		r.Equal(0, code)
 	})
+	r.Contains(output, `"sub": "Abed Nadir"`)
 }
 
 func TestRunVerifySignature(t *testing.T) {
@@ -144,10 +124,8 @@ func TestRunVerifySignature(t *testing.T) {
 	r.NoError(err)
 	keyFile.Close()
 
-	withArgs(t, []string{"jwtdebug", "--no-color", "--verify", "--key-file", keyFile.Name(), token}, func() {
-		code := run()
-		r.Equal(0, code)
-	})
+	code := runWithArgs([]string{"--no-color", "--verify", "--key-file", keyFile.Name(), token})
+	r.Equal(0, code)
 }
 
 func TestRunVerifyInvalidSignature(t *testing.T) {
@@ -168,43 +146,35 @@ func TestRunVerifyInvalidSignature(t *testing.T) {
 	r.NoError(err)
 	wrongKeyFile.Close()
 
-	withArgs(t, []string{"jwtdebug", "--no-color", "--verify", "--key-file", wrongKeyFile.Name(), token}, func() {
-		code := run()
-		r.Equal(3, code, "Expected verification failure exit code")
-	})
+	code := runWithArgs([]string{"--no-color", "--verify", "--key-file", wrongKeyFile.Name(), token})
+	r.Equal(3, code, "Expected verification failure exit code")
 }
 
 func TestRunNoTokenShowsHelp(t *testing.T) {
 	r := require.New(t)
 
-	withArgs(t, []string{"jwtdebug", "--no-color"}, func() {
-		stderr := captureStderr(t, func() {
-			code := run()
-			r.Equal(1, code, "Expected general error exit code for no token")
-		})
-		r.Contains(stderr, "no token provided")
+	stderr := captureStderr(t, func() {
+		code := runWithArgs([]string{"--no-color"})
+		r.Equal(1, code, "Expected general error exit code for no token")
 	})
+	r.Contains(stderr, "no token provided")
 }
 
 func TestRunInvalidToken(t *testing.T) {
 	r := require.New(t)
 
-	withArgs(t, []string{"jwtdebug", "--no-color", "not-a-valid-token"}, func() {
-		code := run()
-		r.Equal(2, code, "Expected invalid token exit code")
-	})
+	code := runWithArgs([]string{"--no-color", "not-a-valid-token"})
+	r.Equal(2, code, "Expected invalid token exit code")
 }
 
 func TestRunVersion(t *testing.T) {
 	r := require.New(t)
 
-	withArgs(t, []string{"jwtdebug", "--version"}, func() {
-		output := captureStdout(t, func() {
-			code := run()
-			r.Equal(0, code)
-		})
-		r.Contains(output, "jwtdebug version")
+	output := captureStdout(t, func() {
+		code := runWithArgs([]string{"--version"})
+		r.Equal(0, code)
 	})
+	r.Contains(output, "jwtdebug version")
 }
 
 func TestRunExpirationCheck(t *testing.T) {
@@ -222,15 +192,11 @@ func TestRunExpirationCheck(t *testing.T) {
 	}, key)
 
 	// Both should exit 0 regardless of expiration status — expiration is informational
-	withArgs(t, []string{"jwtdebug", "--no-color", "--expiration", "--claims=false", expiredToken}, func() {
-		code := run()
-		r.Equal(0, code)
-	})
+	code := runWithArgs([]string{"--no-color", "--expiration", "--claims=false", expiredToken})
+	r.Equal(0, code)
 
-	withArgs(t, []string{"jwtdebug", "--no-color", "--expiration", "--claims=false", validToken}, func() {
-		code := run()
-		r.Equal(0, code)
-	})
+	code = runWithArgs([]string{"--no-color", "--expiration", "--claims=false", validToken})
+	r.Equal(0, code)
 }
 
 func TestRunOutputFormats(t *testing.T) {
@@ -246,13 +212,11 @@ func TestRunOutputFormats(t *testing.T) {
 		t.Run(format, func(t *testing.T) {
 			r := require.New(t)
 
-			withArgs(t, []string{"jwtdebug", "--no-color", "--output", format, "--claims", token}, func() {
-				output := captureStdout(t, func() {
-					code := run()
-					r.Equal(0, code)
-				})
-				r.Contains(output, "Jeff Winger")
+			output := captureStdout(t, func() {
+				code := runWithArgs([]string{"--no-color", "--output", format, "--claims", token})
+				r.Equal(0, code)
 			})
+			r.Contains(output, "Jeff Winger")
 		})
 	}
 }
@@ -267,13 +231,11 @@ func TestRunSmartExtraction(t *testing.T) {
 		"exp": now.Add(time.Hour).Unix(),
 	}, key)
 
-	withArgs(t, []string{"jwtdebug", "--no-color", "--claims", "Bearer " + token}, func() {
-		output := captureStdout(t, func() {
-			code := run()
-			r.Equal(0, code)
-		})
-		r.Contains(output, "Pierce Hawthorne")
+	output := captureStdout(t, func() {
+		code := runWithArgs([]string{"--no-color", "--claims", "Bearer " + token})
+		r.Equal(0, code)
 	})
+	r.Contains(output, "Pierce Hawthorne")
 }
 
 func TestRunStrictModeRejectsBearer(t *testing.T) {
@@ -286,21 +248,17 @@ func TestRunStrictModeRejectsBearer(t *testing.T) {
 		"exp": now.Add(time.Hour).Unix(),
 	}, key)
 
-	withArgs(t, []string{"jwtdebug", "--no-color", "--strict", "Bearer " + token}, func() {
-		code := run()
-		r.Equal(2, code, "Strict mode should reject Bearer prefix")
-	})
+	code := runWithArgs([]string{"--no-color", "--strict", "Bearer " + token})
+	r.Equal(2, code, "Strict mode should reject Bearer prefix")
 }
 
 func TestRunHelpFlag(t *testing.T) {
 	r := require.New(t)
 
-	withArgs(t, []string{"jwtdebug", "--help"}, func() {
-		stderr := captureStderr(t, func() {
-			code := run()
-			r.Equal(0, code)
-		})
-		r.Contains(stderr, "Usage:")
-		r.Contains(stderr, "Options:")
+	stderr := captureStderr(t, func() {
+		code := runWithArgs([]string{"--help"})
+		r.Equal(0, code)
 	})
+	r.Contains(stderr, "Usage:")
+	r.Contains(stderr, "Display:")
 }

@@ -95,7 +95,7 @@ func TestCheckExpiration(t *testing.T) {
 			claims: jwt.MapClaims{
 				"exp": "not-a-timestamp",
 			},
-			wantContains: []string{"Unrecognized expiration value"},
+			wantContains: []string{"Unrecognized exp value"},
 		},
 	}
 

@@ -6,37 +6,86 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/fatih/color"
-
 	"github.com/rselbach/jwtdebug/internal/cli"
 	"github.com/rselbach/jwtdebug/internal/constants"
 )
 
 // Config represents the application configuration
 type Config struct {
-	DefaultFormat    string `json:"defaultFormat"`
-	ColorEnabled     bool   `json:"colorEnabled"`
-	DefaultKeyFile   string `json:"defaultKeyFile"`
-	ShowHeader       bool   `json:"showHeader"`
-	ShowClaims       bool   `json:"showClaims"`
-	ShowSignature    bool   `json:"showSignature"`
-	ShowExpiration   bool   `json:"showExpiration"`
-	DecodeSignature  bool   `json:"decodeSignature"`
-	IgnoreExpiration bool   `json:"ignoreExpiration"`
+	cli.Options
 }
 
 // DefaultConfig returns the default configuration values
 func DefaultConfig() *Config {
 	return &Config{
-		DefaultFormat:    "pretty",
-		ColorEnabled:     true,
-		ShowClaims:       true,
-		ShowHeader:       false,
-		ShowSignature:    false,
-		ShowExpiration:   false,
-		DecodeSignature:  false,
-		IgnoreExpiration: false,
+		Options: cli.Options{
+			Format:           "pretty",
+			Color:            true,
+			Claims:           true,
+			Header:           false,
+			Signature:        false,
+			Expiration:       false,
+			DecodeSignature:  false,
+			IgnoreExpiration: false,
+		},
 	}
+}
+
+// MarshalJSON preserves the original config file field names for backward compatibility.
+func (c Config) MarshalJSON() ([]byte, error) {
+	type proxy struct {
+		DefaultFormat    string `json:"defaultFormat"`
+		ColorEnabled     bool   `json:"colorEnabled"`
+		DefaultKeyFile   string `json:"defaultKeyFile"`
+		ShowHeader       bool   `json:"showHeader"`
+		ShowClaims       bool   `json:"showClaims"`
+		ShowSignature    bool   `json:"showSignature"`
+		ShowExpiration   bool   `json:"showExpiration"`
+		DecodeSignature  bool   `json:"decodeSignature"`
+		IgnoreExpiration bool   `json:"ignoreExpiration"`
+	}
+	return json.Marshal(proxy{
+		DefaultFormat:    c.Options.Format,
+		ColorEnabled:     c.Options.Color,
+		DefaultKeyFile:   c.Options.KeyFile,
+		ShowHeader:       c.Options.Header,
+		ShowClaims:       c.Options.Claims,
+		ShowSignature:    c.Options.Signature,
+		ShowExpiration:   c.Options.Expiration,
+		DecodeSignature:  c.Options.DecodeSignature,
+		IgnoreExpiration: c.Options.IgnoreExpiration,
+	})
+}
+
+// UnmarshalJSON reads the original config file field names into the shared Options struct.
+func (c *Config) UnmarshalJSON(data []byte) error {
+	type proxy struct {
+		DefaultFormat    string `json:"defaultFormat"`
+		ColorEnabled     bool   `json:"colorEnabled"`
+		DefaultKeyFile   string `json:"defaultKeyFile"`
+		ShowHeader       bool   `json:"showHeader"`
+		ShowClaims       bool   `json:"showClaims"`
+		ShowSignature    bool   `json:"showSignature"`
+		ShowExpiration   bool   `json:"showExpiration"`
+		DecodeSignature  bool   `json:"decodeSignature"`
+		IgnoreExpiration bool   `json:"ignoreExpiration"`
+	}
+	var p proxy
+	if err := json.Unmarshal(data, &p); err != nil {
+		return err
+	}
+	c.Options = cli.Options{
+		Format:           p.DefaultFormat,
+		Color:            p.ColorEnabled,
+		KeyFile:          p.DefaultKeyFile,
+		Header:           p.ShowHeader,
+		Claims:           p.ShowClaims,
+		Signature:        p.ShowSignature,
+		Expiration:       p.ShowExpiration,
+		DecodeSignature:  p.DecodeSignature,
+		IgnoreExpiration: p.IgnoreExpiration,
+	}
+	return nil
 }
 
 // defaultConfigPaths returns the default locations to look for config files
@@ -92,8 +141,8 @@ func LoadConfig(configFile string) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
-	if config.DefaultFormat != "" && !cli.ValidFormats[config.DefaultFormat] {
-		return nil, fmt.Errorf("invalid format %q in config, must be one of: pretty, json, raw", config.DefaultFormat)
+	if config.Format != "" && !cli.ValidFormats[config.Format] {
+		return nil, fmt.Errorf("invalid format %q in config, must be one of: pretty, json, raw", config.Format)
 	}
 
 	return config, nil
@@ -107,31 +156,20 @@ func applyIfNotExplicit[T any](explicit bool, field *T, configVal T) {
 
 // ApplyConfig applies the configuration to CLI flags if they weren't explicitly set
 func ApplyConfig(config *Config, f *cli.Flags, ex *cli.Explicit) {
-	applyIfNotExplicit(ex.Format, &f.OutputFormat, config.DefaultFormat)
-	applyIfNotExplicit(ex.Color, &f.OutputColor, config.ColorEnabled)
-	applyIfNotExplicit(ex.KeyFile, &f.KeyFile, config.DefaultKeyFile)
-	applyIfNotExplicit(ex.Header, &f.WithHeader, config.ShowHeader)
-	applyIfNotExplicit(ex.Claims, &f.WithClaims, config.ShowClaims)
-	applyIfNotExplicit(ex.Signature, &f.WithSignature, config.ShowSignature)
-	applyIfNotExplicit(ex.Expiration, &f.ShowExpiration, config.ShowExpiration)
-	applyIfNotExplicit(ex.DecodeBase64, &f.DecodeBase64, config.DecodeSignature)
-	if !ex.IgnoreExpiration && config.IgnoreExpiration {
-		fmt.Fprintln(color.Error, "Warning: ignoring token expiration (from config). Use --ignore-expiration to confirm.")
-	}
+	applyIfNotExplicit(ex.Format, &f.Format, config.Format)
+	applyIfNotExplicit(ex.Color, &f.Color, config.Color)
+	applyIfNotExplicit(ex.KeyFile, &f.KeyFile, config.KeyFile)
+	applyIfNotExplicit(ex.Header, &f.Header, config.Header)
+	applyIfNotExplicit(ex.Claims, &f.Claims, config.Claims)
+	applyIfNotExplicit(ex.Signature, &f.Signature, config.Signature)
+	applyIfNotExplicit(ex.Expiration, &f.Expiration, config.Expiration)
+	applyIfNotExplicit(ex.DecodeSignature, &f.DecodeSignature, config.DecodeSignature)
 	applyIfNotExplicit(ex.IgnoreExpiration, &f.IgnoreExpiration, config.IgnoreExpiration)
 }
 
 // UpdateFromCLI updates the config with CLI values.
 func UpdateFromCLI(config *Config, f *cli.Flags) {
-	config.DefaultFormat = f.OutputFormat
-	config.ColorEnabled = f.OutputColor
-	config.DefaultKeyFile = f.KeyFile
-	config.ShowHeader = f.WithHeader
-	config.ShowClaims = f.WithClaims
-	config.ShowSignature = f.WithSignature
-	config.ShowExpiration = f.ShowExpiration
-	config.DecodeSignature = f.DecodeBase64
-	config.IgnoreExpiration = f.IgnoreExpiration
+	config.Options = f.Options
 }
 
 // SaveConfig saves the current configuration to a file
