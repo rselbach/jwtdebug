@@ -45,7 +45,7 @@ func PrintVerificationSuccess() {
 
 // PrintVerificationFailure prints a failure message for signature verification.
 func PrintVerificationFailure(err error) {
-	fmt.Printf("Signature verification failed: %v\n", err)
+	fmt.Fprintf(color.Error, "Signature verification failed: %v\n", err)
 }
 
 // PrintUnverifiedNotice prints a single-line warning that claims are unverified.

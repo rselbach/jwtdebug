@@ -21,6 +21,17 @@ func testToken(t *testing.T, claims jwt.MapClaims, key string) string {
 	return signed
 }
 
+func writeTempKey(t *testing.T, key string) string {
+	t.Helper()
+	keyFile, err := os.CreateTemp("", "jwtdebug-test-key-*.txt")
+	require.NoError(t, err)
+	t.Cleanup(func() { os.Remove(keyFile.Name()) })
+	_, err = keyFile.WriteString(key)
+	require.NoError(t, err)
+	require.NoError(t, keyFile.Close())
+	return keyFile.Name()
+}
+
 // captureStdout captures stdout during f() and returns the output.
 func captureStdout(t *testing.T, f func()) string {
 	t.Helper()
@@ -107,6 +118,46 @@ func TestRunDecodeRawClaims(t *testing.T) {
 	r.Contains(output, `"sub": "Abed Nadir"`)
 }
 
+func TestRunRawClaimsWithVerifyChecksSignatureFirst(t *testing.T) {
+	r := require.New(t)
+
+	key := "test-secret-key-at-least-32-bytes-long!"
+	wrongKey := "wrong-key-that-is-at-least-32-bytes!!"
+	now := time.Now()
+	token := testToken(t, jwt.MapClaims{
+		"sub": "Verified Raw Claims",
+		"exp": now.Add(time.Hour).Unix(),
+	}, key)
+
+	wrongKeyFile := writeTempKey(t, wrongKey)
+
+	output := captureStdout(t, func() {
+		code := runWithArgs([]string{"--raw-claims", "--verify", "--key-file", wrongKeyFile, token})
+		r.Equal(3, code)
+	})
+	r.Empty(output)
+}
+
+func TestRunRawClaimsWithVerifyKeepsStdoutMachineReadable(t *testing.T) {
+	r := require.New(t)
+
+	key := "test-secret-key-at-least-32-bytes-long!"
+	now := time.Now()
+	token := testToken(t, jwt.MapClaims{
+		"sub": "Verified Raw Claims",
+		"exp": now.Add(time.Hour).Unix(),
+	}, key)
+
+	keyFile := writeTempKey(t, key)
+
+	output := captureStdout(t, func() {
+		code := runWithArgs([]string{"--raw-claims", "--verify", "--key-file", keyFile, token})
+		r.Equal(0, code)
+	})
+	r.Contains(output, `"sub": "Verified Raw Claims"`)
+	r.NotContains(output, "Signature verified successfully")
+}
+
 func TestRunVerifySignature(t *testing.T) {
 	r := require.New(t)
 
@@ -117,14 +168,9 @@ func TestRunVerifySignature(t *testing.T) {
 		"exp": now.Add(time.Hour).Unix(),
 	}, key)
 
-	keyFile, err := os.CreateTemp("", "jwtdebug-test-key-*.txt")
-	r.NoError(err)
-	defer os.Remove(keyFile.Name())
-	_, err = keyFile.WriteString(key)
-	r.NoError(err)
-	keyFile.Close()
+	keyFile := writeTempKey(t, key)
 
-	code := runWithArgs([]string{"--verify", "--key-file", keyFile.Name(), token})
+	code := runWithArgs([]string{"--verify", "--key-file", keyFile, token})
 	r.Equal(0, code)
 }
 
@@ -139,14 +185,9 @@ func TestRunVerifyInvalidSignature(t *testing.T) {
 	}, key)
 
 	wrongKey := "wrong-key-that-is-at-least-32-bytes!!"
-	wrongKeyFile, err := os.CreateTemp("", "jwtdebug-wrong-key-*.txt")
-	r.NoError(err)
-	defer os.Remove(wrongKeyFile.Name())
-	_, err = wrongKeyFile.WriteString(wrongKey)
-	r.NoError(err)
-	wrongKeyFile.Close()
+	wrongKeyFile := writeTempKey(t, wrongKey)
 
-	code := runWithArgs([]string{"--verify", "--key-file", wrongKeyFile.Name(), token})
+	code := runWithArgs([]string{"--verify", "--key-file", wrongKeyFile, token})
 	r.Equal(3, code, "Expected verification failure exit code")
 }
 

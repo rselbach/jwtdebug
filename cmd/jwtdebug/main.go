@@ -91,6 +91,13 @@ func processToken(token string, f *cli.Flags) int {
 		return constants.ExitInvalidToken
 	}
 
+	if f.VerifySignature {
+		if err := verification.VerifyTokenSignature(token, f.KeyFile, f.IgnoreExpiration); err != nil {
+			printer.PrintVerificationFailure(err)
+			return constants.ExitVerificationFail
+		}
+	}
+
 	if f.RawClaims {
 		data, err := json.MarshalIndent(parsed.Claims, "", "  ")
 		if err != nil {
@@ -122,10 +129,6 @@ func processToken(token string, f *cli.Flags) int {
 	}
 
 	if f.VerifySignature {
-		if err := verification.VerifyTokenSignature(token, f.KeyFile, f.IgnoreExpiration); err != nil {
-			printer.PrintVerificationFailure(err)
-			return constants.ExitVerificationFail
-		}
 		printer.PrintVerificationSuccess()
 	}
 

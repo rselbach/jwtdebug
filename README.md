@@ -7,7 +7,7 @@ A fast, modern command-line utility for decoding and debugging JSON Web Tokens (
 - **Fast**: Native Go binary, no runtime dependencies
 - **Secure**: Tokens never leave your machine (unlike jwt.io)
 - **Smart**: Extracts JWTs from cookies, headers, JSON — just paste whatever you copied
-- **Scriptable**: JSON output, exit codes, and raw claims for piping to `jq`
+- **Scriptable**: Raw claims JSON and exit codes for piping to tools like `jq`
 - **Familiar CLI**: Follows conventions from tools like `kubectl`, `jq`, and `curl`
 
 ## Quick Start
@@ -40,11 +40,8 @@ jwtdebug --raw-claims token | jq '.sub'
 - 🔍 **Decode** JWT header, claims, and signature
 - ✅ **Verify** signatures (HMAC, RSA, RSA-PSS, ECDSA, EdDSA)
 - ⏰ **Check** expiration status with human-readable output
-- 🎨 **Colorized** output (disable with `--no-color`)
-- 📤 **Multiple formats**: pretty (default), JSON, raw
+- 📤 **Raw claims output** for scripts and pipelines
 - 📥 **Flexible input**: argument, pipe, clipboard, or stdin
-- ⚙️ **Configurable**: save preferences to `~/.jwtdebug.json`
-- 🐚 **Shell completions**: bash, zsh, fish
 
 ## Installation
 
@@ -98,7 +95,6 @@ command | jwtdebug [options]   # read from pipe
 | `--claims` | `-c` | Show token claims (default: true) |
 | `--signature` | `-s` | Show token signature |
 | `--expiration` | `-e` | Check token expiration status |
-| `--decode-signature` | | Decode signature from base64 to hex |
 | `--raw-claims` | | Output only raw claims JSON (for piping) |
 
 ### Verification Options
@@ -108,14 +104,6 @@ command | jwtdebug [options]   # read from pipe
 | `--verify` | `-V` | Verify token signature |
 | `--key-file` | `-k` | Key file for signature verification |
 | `--ignore-expiration` | | Ignore token expiration when verifying |
-
-### Output Options
-
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--output` | `-o` | Output format: `pretty`, `json`, or `raw` |
-| `--color` | | Colorize output (default: true) |
-| `--no-color` | | Disable colored output |
 
 ### Input Options
 
@@ -139,9 +127,6 @@ Use `--strict` if you need exact input matching.
 | `--version` | | Show version information |
 | `--quiet` | `-q` | Suppress informational notices |
 | `--verbose` | `-v` | Enable verbose output |
-| `--completion` | | Generate shell completion (bash, zsh, fish) |
-| `--config` | | Path to config file |
-| `--save-config` | | Save current settings to config file |
 
 ## Examples
 
@@ -151,12 +136,11 @@ Use `--strict` if you need exact input matching.
 $ jwtdebug eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ
 
 CLAIMS:
-  Standard Claims:
-    Subject: 1234567890
-
-  Custom Claims:
-    admin: true
-    name:  John Doe
+{
+  "admin": true,
+  "name": "John Doe",
+  "sub": "1234567890"
+}
 ```
 
 ### Show Everything
@@ -171,15 +155,18 @@ HEADER:
 }
 
 CLAIMS:
-  Standard Claims:
-    Subject:    1234567890
-    Expiration: 1716239022 (2024-05-21T03:23:42Z)
+{
+  "exp": 1716239022,
+  "sub": "1234567890"
+}
 
 SIGNATURE:
-Raw: TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ
+{
+  "raw": "TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ"
+}
 
 EXPIRATION:
-✓ Token expires at 2024-05-21T03:23:42Z (in 30 days)
+Token expires at 2024-05-21T03:23:42Z (2592000 seconds from now)
 ```
 
 ### Verify Signature
@@ -187,10 +174,11 @@ EXPIRATION:
 ```bash
 $ jwtdebug -V -k public.pem token
 CLAIMS:
+{
   ...
+}
 
-VERIFICATION:
-✓ Signature verified successfully
+Signature verified successfully
 ```
 
 **Key formats by algorithm:**
@@ -219,35 +207,6 @@ cat token.txt | jwtdebug
 curl -s https://api.example.com/token | jwtdebug
 ```
 
-## Shell Completions
-
-Generate and install shell completions:
-
-```bash
-# Bash
-jwtdebug --completion bash > /usr/local/etc/bash_completion.d/jwtdebug
-
-# Zsh
-jwtdebug --completion zsh > "${fpath[1]}/_jwtdebug"
-
-# Fish
-jwtdebug --completion fish > ~/.config/fish/completions/jwtdebug.fish
-```
-
-## Configuration
-
-Save your preferred settings:
-
-```bash
-# Save current options as defaults
-jwtdebug -o json --no-color --save-config
-
-# Use a specific config file
-jwtdebug --config ~/.config/jwtdebug/work.json token
-```
-
-See [CONFIG.md](docs/CONFIG.md) for details.
-
 ## Exit Codes
 
 | Code | Meaning |
@@ -256,7 +215,6 @@ See [CONFIG.md](docs/CONFIG.md) for details.
 | 1 | General error |
 | 2 | Invalid token format |
 | 3 | Signature verification failed |
-| 4 | Configuration error |
 
 ## Comparison with Alternatives
 
@@ -264,8 +222,6 @@ See [CONFIG.md](docs/CONFIG.md) for details.
 |---------|----------|--------|---------|
 | Offline/secure | ✅ | ❌ | ✅ |
 | Signature verification | ✅ | ✅ | ✅ |
-| Shell completions | ✅ | N/A | ❌ |
-| Config file | ✅ | N/A | ❌ |
 | Pipe-friendly | ✅ | ❌ | ✅ |
 | Homebrew install | ✅ | N/A | ✅ |
 
@@ -276,8 +232,6 @@ jwtdebug/
 ├── cmd/jwtdebug/      # Entry point
 ├── internal/
 │   ├── cli/           # Command-line flags
-│   ├── completions/   # Shell completions
-│   ├── config/        # Configuration handling
 │   ├── parser/        # JWT parsing
 │   ├── printer/       # Output formatting
 │   └── verification/  # Signature verification

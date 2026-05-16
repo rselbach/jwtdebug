@@ -24,7 +24,7 @@ func ParseToken(tokenString string) (*ParsedToken, error) {
 		return nil, fmt.Errorf("invalid token format: expected 3 parts separated by '.', got %d (token: %s)", len(parts), snippet)
 	}
 
-	token, _, err := jwt.NewParser().ParseUnverified(tokenString, jwt.MapClaims{})
+	token, _, err := jwt.NewParser(jwt.WithJSONNumber()).ParseUnverified(tokenString, jwt.MapClaims{})
 	if err != nil {
 		snippet := tokenSnippet(tokenString)
 		return nil, fmt.Errorf("failed to parse token (%s): %w", snippet, err)

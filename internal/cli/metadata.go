@@ -153,7 +153,8 @@ func PrintUsage() {
 		}
 	}
 
-	fmt.Fprintf(color.Error, `\nExamples:
+	fmt.Fprintf(color.Error, `
+Examples:
   jwtdebug eyJhbGci...              # Decode a token
   echo "Bearer eyJ..." | jwtdebug   # Read from pipe (strips "Bearer " prefix)
   pbpaste | jwtdebug                # Decode token from clipboard (macOS)

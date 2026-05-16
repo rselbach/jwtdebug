@@ -5,10 +5,10 @@ import (
 	"strings"
 )
 
-// jwtPattern matches a JWT token: three base64url-encoded parts separated by dots.
-// The header and payload always start with "eyJ" (base64 of `{"`).
+// jwtPattern matches compact JWT candidates: three base64url-encoded parts
+// separated by dots. Candidates are parsed before they are accepted.
 // Signature may be empty for unsecured JWTs (alg=none).
-var jwtPattern = regexp.MustCompile(`eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*`)
+var jwtPattern = regexp.MustCompile(`[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*`)
 
 // NormalizeTokenString extracts a JWT token from the input string.
 // When strict is true, it only trims whitespace and expects an exact token.
@@ -24,8 +24,10 @@ func NormalizeTokenString(s string, strict bool) string {
 		return s
 	}
 
-	if match := jwtPattern.FindString(s); match != "" {
-		return match
+	for _, match := range jwtPattern.FindAllString(s, -1) {
+		if _, err := ParseToken(match); err == nil {
+			return match
+		}
 	}
 
 	return s

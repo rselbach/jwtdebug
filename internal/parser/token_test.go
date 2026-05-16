@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -65,8 +67,24 @@ func TestParseToken(t *testing.T) {
 	}
 }
 
+func TestParseTokenPreservesLargeNumbers(t *testing.T) {
+	r := require.New(t)
+
+	token := encodeSegment(`{"alg":"none","typ":"JWT"}`) + "." +
+		encodeSegment(`{"id":9007199254740993}`) + "."
+
+	parsed, err := ParseToken(token)
+	r.NoError(err)
+
+	id, ok := parsed.Claims["id"].(json.Number)
+	r.True(ok, "expected large number to remain json.Number, got %T", parsed.Claims["id"])
+	r.Equal("9007199254740993", id.String())
+}
+
 func TestNormalizeTokenString(t *testing.T) {
 	validJWT := "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NSJ9.signature123"
+	whitespaceJSONJWT := encodeSegment("{\n  \"alg\": \"none\",\n  \"typ\": \"JWT\"\n}") + "." +
+		encodeSegment("{\n  \"sub\": \"12345\"\n}") + "."
 
 	tests := map[string]struct {
 		in     string
@@ -109,6 +127,10 @@ func TestNormalizeTokenString(t *testing.T) {
 			in:   "Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIxMjMifQ.",
 			want: "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIxMjMifQ.",
 		},
+		"bearer token with formatted json segments": {
+			in:   "Bearer " + whitespaceJSONJWT,
+			want: whitespaceJSONJWT,
+		},
 		"raw jwt": {
 			in:   validJWT,
 			want: validJWT,
@@ -148,4 +170,8 @@ func TestNormalizeTokenString(t *testing.T) {
 			r.Equal(tc.want, got)
 		})
 	}
+}
+
+func encodeSegment(s string) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(s))
 }

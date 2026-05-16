@@ -80,7 +80,7 @@ func VerifyTokenSignature(tokenString, keyFile string, ignoreExpiration bool) er
 		return fmt.Errorf("failed to read key file: %w", err)
 	}
 
-	parseOpts := []jwt.ParserOption{jwt.WithValidMethods(validAlgorithms)}
+	parseOpts := []jwt.ParserOption{jwt.WithValidMethods(validAlgorithms), jwt.WithJSONNumber()}
 
 	_, err = jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
 		parser, ok := keyParsers[token.Method.Alg()]
