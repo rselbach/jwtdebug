@@ -23,6 +23,9 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v2
+
       - name: Install cargo-zigbuild
         run: cargo install --locked cargo-zigbuild
 
