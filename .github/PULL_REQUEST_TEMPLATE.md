@@ -14,5 +14,5 @@ How was this tested?
 ## Checklist
 
 - [ ] Tests pass (`make test`)
-- [ ] Code follows project style (`goimports`)
+- [ ] Code follows project style (`cargo fmt`, `cargo clippy`)
 - [ ] Documentation updated (if applicable)

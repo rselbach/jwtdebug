@@ -4,7 +4,7 @@ A fast, modern command-line utility for decoding and debugging JSON Web Tokens (
 
 ## Why jwtdebug?
 
-- **Fast**: Native Go binary, no runtime dependencies
+- **Fast**: Native Rust binary, no runtime dependencies
 - **Secure**: Tokens never leave your machine (unlike jwt.io)
 - **Smart**: Extracts JWTs from cookies, headers, JSON — just paste whatever you copied
 - **Scriptable**: Raw claims JSON and exit codes for piping to tools like `jq`
@@ -229,12 +229,12 @@ curl -s https://api.example.com/token | jwtdebug
 
 ```
 jwtdebug/
-├── cmd/jwtdebug/      # Entry point
-├── internal/
-│   ├── cli/           # Command-line flags
-│   ├── parser/        # JWT parsing
-│   ├── printer/       # Output formatting
-│   └── verification/  # Signature verification
+├── src/
+│   ├── cli.rs         # Command-line flags
+│   ├── parser.rs      # JWT parsing
+│   ├── printer.rs     # Output formatting
+│   └── verification.rs # Signature verification
+├── tests/             # CLI parity tests
 └── docs/              # Documentation
 ```
 

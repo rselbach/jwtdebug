@@ -19,13 +19,13 @@ make test
 make install
 ```
 
-Requires Go 1.21 or later.
+Requires a stable Rust toolchain.
 
 ## Code Style
 
-- Run `goimports` before committing
-- Follow standard Go conventions
-- Use table-driven tests with `testify/require`
+- Run `cargo fmt` before committing
+- Keep `cargo clippy -- -D warnings` clean
+- Add focused unit or CLI integration tests for behavior changes
 - Keep it simple — avoid over-engineering
 
 ## Pull Requests

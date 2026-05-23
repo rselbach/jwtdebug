@@ -1,12 +1,8 @@
-.PHONY: all build clean test
+.PHONY: all build clean test install
 
 # Binary name
 BINARY_NAME=jwtdebug
 
-# Go related variables
-GOBASE=$(shell pwd)
-GOBIN=$(GOBASE)/bin
-GOFILES=$(wildcard ./cmd/jwtdebug/*.go) $(wildcard ./internal/*/*.go)
 BUILD_DIR=build
 
 # Version from git: if a tag exists, use the tag, otherwise use the commit hash
@@ -15,30 +11,34 @@ VERSION=$(shell if [ -n "$(GORELEASER_CURRENT_TAG)" ]; then echo $(GORELEASER_CU
 COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-# Use linker flags to provide version/build info
-LDFLAGS=-ldflags "-s -w \
-	-X github.com/rselbach/jwtdebug/internal/cli.Version=$(VERSION) \
-	-X github.com/rselbach/jwtdebug/internal/cli.Commit=$(COMMIT) \
-	-X github.com/rselbach/jwtdebug/internal/cli.BuildDate=$(BUILD_DATE)"
-
 all: build
 
-build: 
+build:
 	@echo "Building $(BINARY_NAME)..."
 	@mkdir -p $(BUILD_DIR)
-	@go build -o $(BUILD_DIR)/$(BINARY_NAME) $(LDFLAGS) ./cmd/jwtdebug
+	@JWTDEBUG_VERSION=$(VERSION) \
+		JWTDEBUG_COMMIT=$(COMMIT) \
+		JWTDEBUG_BUILD_DATE=$(BUILD_DATE) \
+		cargo build --release
+	@cp target/release/$(BINARY_NAME) $(BUILD_DIR)/$(BINARY_NAME)
 	@echo "Build successful! The binary '$(BUILD_DIR)/$(BINARY_NAME)' is now available."
 
 clean:
 	@echo "Cleaning..."
 	@rm -rf $(BUILD_DIR)
+	@cargo clean
 	@echo "Done!"
 
 test:
-	@echo "Running tests..."
-	@go test -v ./...
+	@echo "Running Rust tests..."
+	@cargo fmt --check
+	@cargo clippy -- -D warnings
+	@cargo test
 
 install:
 	@echo "Installing $(BINARY_NAME) version $(VERSION)..."
-	@go install $(LDFLAGS) ./cmd/jwtdebug
+	@JWTDEBUG_VERSION=$(VERSION) \
+		JWTDEBUG_COMMIT=$(COMMIT) \
+		JWTDEBUG_BUILD_DATE=$(BUILD_DATE) \
+		cargo install --path .
 	@echo "Installation successful!"

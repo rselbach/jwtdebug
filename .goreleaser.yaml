@@ -4,43 +4,40 @@ version: 2
 
 before:
   hooks:
-    - go mod tidy
+    - cargo fetch --locked
 
 builds:
   - id: linux
-    main: ./cmd/jwtdebug
+    builder: rust
     binary: jwtdebug
-    ldflags:
-      - -X github.com/rselbach/jwtdebug/internal/cli.Version={{ .Version }}
-      - -X github.com/rselbach/jwtdebug/internal/cli.Commit={{ .ShortCommit }}
-      - -X github.com/rselbach/jwtdebug/internal/cli.BuildDate={{ .Date }}
-      - -s
-      - -w
+    command: zigbuild
+    flags:
+      - --release
     env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-    goarch:
-      - amd64
-      - arm64
+      - JWTDEBUG_VERSION={{ .Version }}
+      - JWTDEBUG_COMMIT={{ .ShortCommit }}
+      - JWTDEBUG_BUILD_DATE={{ .Date }}
+    targets:
+      - x86_64-unknown-linux-gnu
+      - aarch64-unknown-linux-gnu
     hooks:
       post:
         - cmd: ./scripts/build-appimage.sh "{{ .Path }}" "{{ .ProjectName }}" "{{ .Version }}"
 
   - id: default
-    main: ./cmd/jwtdebug
+    builder: rust
     binary: jwtdebug
-    ldflags:
-      - -X github.com/rselbach/jwtdebug/internal/cli.Version={{ .Version }}
-      - -X github.com/rselbach/jwtdebug/internal/cli.Commit={{ .ShortCommit }}
-      - -X github.com/rselbach/jwtdebug/internal/cli.BuildDate={{ .Date }}
-      - -s
-      - -w
+    command: zigbuild
+    flags:
+      - --release
     env:
-      - CGO_ENABLED=0
-    goos:
-      - darwin
-      - windows
+      - JWTDEBUG_VERSION={{ .Version }}
+      - JWTDEBUG_COMMIT={{ .ShortCommit }}
+      - JWTDEBUG_BUILD_DATE={{ .Date }}
+    targets:
+      - x86_64-apple-darwin
+      - aarch64-apple-darwin
+      - x86_64-pc-windows-gnu
 
 brews:
   - homepage: https://github.com/rselbach/jwtdebug
