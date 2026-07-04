@@ -83,11 +83,6 @@ nfpms:
       - rpm
       - archlinux
     bindir: /usr/bin
-    contents:
-      - src: docs/jwtdebug.1
-        dst: /usr/share/man/man1/jwtdebug.1
-        file_info:
-          mode: 0644
 
 changelog:
   sort: asc
