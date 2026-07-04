@@ -193,7 +193,7 @@ fn validate_time_claims(payload: &str) -> Result<(), VerificationError> {
         .map_or(0, |duration| duration.as_secs() as i64);
 
     if let Some(exp) = claims.get("exp").and_then(value_as_i64) {
-        if now > exp {
+        if now >= exp {
             return Err(VerificationError::TokenExpired);
         }
     }

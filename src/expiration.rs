@@ -17,7 +17,7 @@ pub fn check_expiration(claims: &Map<String, Value>) {
         "exp",
         claims,
         |timestamp| {
-            if now > timestamp {
+            if now >= timestamp {
                 println!(
                     "Token expired at {} ({} seconds ago)",
                     format_timestamp(timestamp),
