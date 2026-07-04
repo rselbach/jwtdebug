@@ -1,8 +1,15 @@
+use std::sync::LazyLock;
+
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use regex::Regex;
 use serde_json::{Map, Value};
 use thiserror::Error;
+
+static JWT_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*")
+        .expect("JWT extraction regex must compile")
+});
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParsedToken {
@@ -51,9 +58,7 @@ pub fn normalize_token_string(s: &str, strict: bool) -> String {
         return s.to_string();
     }
 
-    let pattern = Regex::new(r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*")
-        .expect("JWT extraction regex must compile");
-    for candidate in pattern.find_iter(s) {
+    for candidate in JWT_PATTERN.find_iter(s) {
         let candidate = candidate.as_str();
         if parse_token(candidate).is_ok() {
             return candidate.to_string();
