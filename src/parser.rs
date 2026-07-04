@@ -85,7 +85,12 @@ fn token_snippet(token: &str) -> String {
         return token.to_string();
     }
 
-    format!("{}...", &token[..17])
+    let cut = token
+        .char_indices()
+        .take(17)
+        .last()
+        .map_or(17, |(i, c)| i + c.len_utf8());
+    format!("{}...", &token[..cut])
 }
 
 #[cfg(test)]
@@ -149,5 +154,12 @@ mod tests {
             "Bearer not.a.jwt",
             normalize_token_string("  Bearer not.a.jwt  ", true)
         );
+    }
+
+    #[test]
+    fn snippet_does_not_panic_on_multibyte_utf8() {
+        let input = "这是没有JWT的中文文本测试一下看看会不会崩溃啊啊啊";
+        let err = parse_token(input).expect_err("not a valid token");
+        assert!(!err.to_string().is_empty());
     }
 }
