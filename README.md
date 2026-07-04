@@ -230,12 +230,15 @@ curl -s https://api.example.com/token | jwtdebug
 ```
 jwtdebug/
 ├── src/
-│   ├── cli.rs         # Command-line flags
-│   ├── parser.rs      # JWT parsing
-│   ├── printer.rs     # Output formatting
-│   └── verification.rs # Signature verification
-├── tests/             # CLI parity tests
-└── docs/              # Documentation
+│   ├── cli.rs           # Command-line flags
+│   ├── constants.rs     # Exit codes and limits
+│   ├── expiration.rs    # Expiration checking
+│   ├── main.rs          # Entry point and flow control
+│   ├── parser.rs        # JWT parsing and smart extraction
+│   ├── printer.rs       # Output formatting
+│   └── verification.rs  # Signature verification
+├── tests/               # CLI integration tests
+└── scripts/             # Build scripts (AppImage)
 ```
 
 ## Contributing
