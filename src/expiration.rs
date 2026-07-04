@@ -97,9 +97,7 @@ fn print_time_claim<F, M>(
 
 fn try_parse_timestamp(value: &Value) -> Option<i64> {
     let timestamp = match value {
-        Value::Number(number) => number
-            .as_i64()
-            .or_else(|| number.as_u64().and_then(|n| n.try_into().ok()))?,
+        Value::Number(number) => number.as_i64()?,
         Value::String(s) => parse_rfc3339_timestamp(s).or_else(|| s.parse::<i64>().ok())?,
         _ => return None,
     };

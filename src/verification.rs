@@ -214,9 +214,7 @@ fn validate_time_claims(payload: &str) -> Result<(), VerificationError> {
 
 fn value_as_i64(value: &Value) -> Option<i64> {
     match value {
-        Value::Number(number) => number
-            .as_i64()
-            .or_else(|| number.as_u64().and_then(|n| n.try_into().ok())),
+        Value::Number(number) => number.as_i64(),
         _ => None,
     }
 }
