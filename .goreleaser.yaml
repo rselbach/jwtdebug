@@ -43,7 +43,7 @@ brews:
   - homepage: https://github.com/rselbach/jwtdebug
     license: MIT
     description: >-
-      A command line tool to decode, verify and generate JWTs (JSON Web Tokens).
+      A command line tool to decode and debug JWTs (JSON Web Tokens).
     repository:
       owner: rselbach
       name: homebrew-tap
@@ -77,7 +77,7 @@ nfpms:
     maintainer: Roberto Selbach <r@selbach.dev>
     license: MIT
     description: >-
-      A command line tool to decode, verify and generate JWTs (JSON Web Tokens).
+      A command line tool to decode and debug JWTs (JSON Web Tokens).
     formats:
       - deb
       - rpm
