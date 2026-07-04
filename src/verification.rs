@@ -13,7 +13,9 @@ use thiserror::Error;
 
 use crate::constants::MAX_FILE_SIZE_BYTES;
 
-const MIN_HMAC_KEY_LEN: usize = 32;
+const MIN_HMAC_KEY_LEN_HS256: usize = 32;
+const MIN_HMAC_KEY_LEN_HS384: usize = 48;
+const MIN_HMAC_KEY_LEN_HS512: usize = 64;
 
 #[derive(Debug, Error)]
 pub enum VerificationError {
@@ -32,8 +34,8 @@ pub enum VerificationError {
     #[error("failed to read key file: {0}")]
     ReadKeyFile(#[source] std::io::Error),
 
-    #[error("HMAC key too short: {actual} bytes (minimum {MIN_HMAC_KEY_LEN})")]
-    HmacKeyTooShort { actual: usize },
+    #[error("HMAC key too short: {actual} bytes (minimum {minimum} bytes)")]
+    HmacKeyTooShort { actual: usize, minimum: usize },
 
     #[error("unexpected signing method: {0}")]
     UnexpectedAlgorithm(String),
@@ -106,9 +108,15 @@ pub fn verify_token_signature(
 fn decoding_key(algorithm: Algorithm, key_data: &[u8]) -> Result<DecodingKey, VerificationError> {
     match algorithm {
         Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => {
-            if key_data.len() < MIN_HMAC_KEY_LEN {
+            let min_len = match algorithm {
+                Algorithm::HS256 => MIN_HMAC_KEY_LEN_HS256,
+                Algorithm::HS384 => MIN_HMAC_KEY_LEN_HS384,
+                _ => MIN_HMAC_KEY_LEN_HS512,
+            };
+            if key_data.len() < min_len {
                 return Err(VerificationError::HmacKeyTooShort {
                     actual: key_data.len(),
+                    minimum: min_len,
                 });
             }
             Ok(DecodingKey::from_secret(key_data))
