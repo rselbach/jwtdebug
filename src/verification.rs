@@ -46,8 +46,14 @@ pub enum VerificationError {
     #[error("failed to decode token header: {0}")]
     DecodeHeader(#[source] Box<dyn std::error::Error + Send + Sync>),
 
+    #[error("failed to decode token payload: {0}")]
+    DecodePayload(#[source] Box<dyn std::error::Error + Send + Sync>),
+
     #[error("failed to decode token signature: {0}")]
     DecodeSignature(#[source] base64::DecodeError),
+
+    #[error("key file is not valid UTF-8: {0}")]
+    KeyFileNotUtf8(#[source] std::str::Utf8Error),
 
     #[error("failed to parse ES512 public key: {0}")]
     Es512Key(#[source] p521::pkcs8::spki::Error),
@@ -165,8 +171,7 @@ fn verify_es512(
         .decode(parts[2])
         .map_err(VerificationError::DecodeSignature)?;
     let signature = Signature::from_slice(&signature).map_err(VerificationError::Es512Signature)?;
-    let key_pem = std::str::from_utf8(key_data)
-        .map_err(|err| VerificationError::DecodeHeader(Box::new(err)))?;
+    let key_pem = std::str::from_utf8(key_data).map_err(VerificationError::KeyFileNotUtf8)?;
     let verifying_key =
         VerifyingKey::from_public_key_pem(key_pem).map_err(VerificationError::Es512Key)?;
 
@@ -185,9 +190,9 @@ fn verify_es512(
 fn validate_time_claims(payload: &str) -> Result<(), VerificationError> {
     let data = URL_SAFE_NO_PAD
         .decode(payload)
-        .map_err(|err| VerificationError::DecodeHeader(Box::new(err)))?;
+        .map_err(|err| VerificationError::DecodePayload(Box::new(err)))?;
     let claims = serde_json::from_slice::<Value>(&data)
-        .map_err(|err| VerificationError::DecodeHeader(Box::new(err)))?;
+        .map_err(|err| VerificationError::DecodePayload(Box::new(err)))?;
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |duration| duration.as_secs() as i64);
