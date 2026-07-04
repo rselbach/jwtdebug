@@ -8,7 +8,7 @@ use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use p521::ecdsa::signature::Verifier;
 use p521::ecdsa::{Signature, VerifyingKey};
 use p521::pkcs8::DecodePublicKey;
-use serde_json::Value;
+use serde_json::{Map, Value};
 use thiserror::Error;
 
 use crate::constants::MAX_FILE_SIZE_BYTES;
@@ -43,9 +43,6 @@ pub enum VerificationError {
     #[error("invalid token format: expected 3 parts separated by '.', got {0}")]
     InvalidTokenParts(usize),
 
-    #[error("failed to decode token header: {0}")]
-    DecodeHeader(#[source] Box<dyn std::error::Error + Send + Sync>),
-
     #[error("failed to decode token payload: {0}")]
     DecodePayload(#[source] Box<dyn std::error::Error + Send + Sync>),
 
@@ -76,6 +73,7 @@ pub enum VerificationError {
 
 pub fn verify_token_signature(
     token: &str,
+    header: &Map<String, Value>,
     key_file: Option<&str>,
     ignore_expiration: bool,
 ) -> Result<(), VerificationError> {
@@ -92,13 +90,16 @@ pub fn verify_token_signature(
     }
 
     let key_data = fs::read(key_file).map_err(VerificationError::ReadKeyFile)?;
-    let algorithm_name = algorithm_name(token)?;
+    let algorithm_name = header
+        .get("alg")
+        .and_then(Value::as_str)
+        .ok_or_else(|| VerificationError::UnexpectedAlgorithm("<missing>".to_string()))?;
     if algorithm_name == "ES512" {
         return verify_es512(token, &key_data, ignore_expiration);
     }
 
-    let algorithm = Algorithm::from_str(&algorithm_name)
-        .map_err(|_| VerificationError::UnexpectedAlgorithm(algorithm_name.clone()))?;
+    let algorithm = Algorithm::from_str(algorithm_name)
+        .map_err(|_| VerificationError::UnexpectedAlgorithm(algorithm_name.to_string()))?;
     let key = decoding_key(algorithm, &key_data)?;
 
     let mut validation = Validation::new(algorithm);
@@ -136,25 +137,6 @@ fn decoding_key(algorithm: Algorithm, key_data: &[u8]) -> Result<DecodingKey, Ve
         Algorithm::ES256 | Algorithm::ES384 => Ok(DecodingKey::from_ec_pem(key_data)?),
         Algorithm::EdDSA => Ok(DecodingKey::from_ed_pem(key_data)?),
     }
-}
-
-fn algorithm_name(token: &str) -> Result<String, VerificationError> {
-    let parts = token.split('.').collect::<Vec<_>>();
-    if parts.len() != 3 {
-        return Err(VerificationError::InvalidTokenParts(parts.len()));
-    }
-
-    let header_data = URL_SAFE_NO_PAD
-        .decode(parts[0])
-        .map_err(|err| VerificationError::DecodeHeader(Box::new(err)))?;
-    let header = serde_json::from_slice::<Value>(&header_data)
-        .map_err(|err| VerificationError::DecodeHeader(Box::new(err)))?;
-
-    header
-        .get("alg")
-        .and_then(Value::as_str)
-        .map(str::to_string)
-        .ok_or_else(|| VerificationError::UnexpectedAlgorithm("<missing>".to_string()))
 }
 
 fn verify_es512(
@@ -233,6 +215,7 @@ mod tests {
     use tempfile::NamedTempFile;
 
     use super::*;
+    use crate::parser;
 
     #[test]
     fn verifies_es512_token() {
@@ -257,8 +240,11 @@ mod tests {
             URL_SAFE_NO_PAD.encode(signature.to_bytes())
         );
 
+        let parsed = parser::parse_token(&token).expect("parse token");
+
         let err = verify_token_signature(
             &token,
+            &parsed.header,
             Some(key_file.path().to_str().expect("utf-8 path")),
             false,
         );
@@ -288,11 +274,13 @@ mod tests {
             URL_SAFE_NO_PAD.encode(signature.to_bytes())
         );
         let key_file = key_file.path().to_str().expect("utf-8 path");
+        let parsed = parser::parse_token(&token).expect("parse token");
 
-        let err = verify_token_signature(&token, Some(key_file), false).expect_err("expired token");
+        let err = verify_token_signature(&token, &parsed.header, Some(key_file), false)
+            .expect_err("expired token");
         assert!(matches!(err, VerificationError::TokenExpired));
 
-        let err = verify_token_signature(&token, Some(key_file), true);
+        let err = verify_token_signature(&token, &parsed.header, Some(key_file), true);
         assert!(
             err.is_ok(),
             "expected expired ES512 token to pass with ignore-expiration: {err:?}"
