@@ -107,7 +107,6 @@ pub fn verify_token_signature(
     let key = decoding_key(algorithm, &key_data)?;
 
     let mut validation = Validation::new(algorithm);
-    validation.algorithms = vec![algorithm];
     validation.required_spec_claims.clear();
     // jsonwebtoken rejects any token carrying an aud claim unless an expected
     // audience is configured; as a debug tool we accept any audience.
