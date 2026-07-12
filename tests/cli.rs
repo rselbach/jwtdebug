@@ -539,6 +539,28 @@ fn short_hmac_key_exits_3() {
 }
 
 #[test]
+fn token_with_aud_claim_verifies_successfully() {
+    let secret = b"test-secret-key-at-least-32-bytes-long!";
+    let token = hmac_token(
+        secret,
+        json!({ "sub": "Troy Barnes", "aud": "greendale-community-college" }),
+    );
+    let key_file = key_file(secret);
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args([
+            "--verify",
+            "--key-file",
+            key_file.path().to_str().expect("utf-8 path"),
+            &token,
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Signature verified successfully"));
+}
+
+#[test]
 fn expired_hmac_token_fails_unless_ignored() {
     let secret = b"test-secret-key-at-least-32-bytes-long!";
     let token = hmac_token(
