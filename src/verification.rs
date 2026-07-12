@@ -13,6 +13,10 @@ use thiserror::Error;
 
 use crate::constants::MAX_FILE_SIZE_BYTES;
 
+// Clock-skew tolerance for exp/nbf, matching jsonwebtoken's default so the
+// hand-rolled ES512 path behaves like every other algorithm.
+const LEEWAY_SECONDS: i64 = 60;
+
 const MIN_HMAC_KEY_LEN_HS256: usize = 32;
 const MIN_HMAC_KEY_LEN_HS384: usize = 48;
 const MIN_HMAC_KEY_LEN_HS512: usize = 64;
@@ -183,13 +187,13 @@ fn validate_time_claims(payload: &str) -> Result<(), VerificationError> {
         .map_or(0, |duration| duration.as_secs() as i64);
 
     if let Some(exp) = claims.get("exp").and_then(value_as_i64) {
-        if now >= exp {
+        if now - exp > LEEWAY_SECONDS {
             return Err(VerificationError::TokenExpired);
         }
     }
 
     if let Some(nbf) = claims.get("nbf").and_then(value_as_i64) {
-        if now < nbf {
+        if nbf - now > LEEWAY_SECONDS {
             return Err(VerificationError::TokenNotValidYet);
         }
     }
@@ -252,6 +256,43 @@ mod tests {
             false,
         );
         assert!(err.is_ok(), "expected ES512 verification to pass: {err:?}");
+    }
+
+    #[test]
+    fn accepts_es512_token_expired_within_leeway() {
+        let signing_key = SigningKey::generate();
+        let public_key = signing_key
+            .verifying_key()
+            .to_public_key_pem(LineEnding::LF)
+            .expect("encode public key");
+        let key_file = NamedTempFile::new().expect("create key file");
+        fs::write(key_file.path(), public_key).expect("write key file");
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time after epoch")
+            .as_secs();
+        let header = URL_SAFE_NO_PAD.encode(r#"{"alg":"ES512","typ":"JWT"}"#);
+        let claims = URL_SAFE_NO_PAD.encode(format!(r#"{{"sub":"ES512","exp":{}}}"#, now - 30));
+        let signing_input = format!("{header}.{claims}");
+        let signature: Signature = signing_key.sign(signing_input.as_bytes());
+        let token = format!(
+            "{signing_input}.{}",
+            URL_SAFE_NO_PAD.encode(signature.to_bytes())
+        );
+
+        let parsed = parser::parse_token(&token).expect("parse token");
+
+        let err = verify_token_signature(
+            &token,
+            &parsed.header,
+            Some(key_file.path().to_str().expect("utf-8 path")),
+            false,
+        );
+        assert!(
+            err.is_ok(),
+            "expected token within leeway to verify: {err:?}"
+        );
     }
 
     #[test]
