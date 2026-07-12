@@ -13,86 +13,53 @@ pub fn check_expiration(claims: &Map<String, Value>) {
         .map_or(0, |duration| duration.as_secs() as i64);
 
     println!("EXPIRATION:");
-    print_time_claim(
-        "exp",
-        claims,
-        |timestamp| {
-            if now >= timestamp {
-                println!(
-                    "Token expired at {} ({} seconds ago)",
-                    format_timestamp(timestamp),
-                    now - timestamp
-                );
-                return;
-            }
+    match time_claim(claims, "exp") {
+        Some(exp) if now >= exp => println!(
+            "Token expired at {} ({} seconds ago)",
+            format_timestamp(exp),
+            now - exp
+        ),
+        Some(exp) => println!(
+            "Token expires at {} ({} seconds from now)",
+            format_timestamp(exp),
+            exp - now
+        ),
+        None if !claims.contains_key("exp") => println!("No expiration claim found"),
+        None => {}
+    }
 
-            println!(
-                "Token expires at {} ({} seconds from now)",
-                format_timestamp(timestamp),
-                timestamp - now
-            );
-        },
-        Some(|| println!("No expiration claim found")),
-    );
+    match time_claim(claims, "nbf") {
+        Some(nbf) if now < nbf => println!(
+            "Token not valid yet. Valid from {} (in {} seconds)",
+            format_timestamp(nbf),
+            nbf - now
+        ),
+        Some(nbf) => println!(
+            "Token valid since {} ({} seconds ago)",
+            format_timestamp(nbf),
+            now - nbf
+        ),
+        None => {}
+    }
 
-    print_time_claim(
-        "nbf",
-        claims,
-        |timestamp| {
-            if now < timestamp {
-                println!(
-                    "Token not valid yet. Valid from {} (in {} seconds)",
-                    format_timestamp(timestamp),
-                    timestamp - now
-                );
-                return;
-            }
-
-            println!(
-                "Token valid since {} ({} seconds ago)",
-                format_timestamp(timestamp),
-                now - timestamp
-            );
-        },
-        None::<fn()>,
-    );
-
-    print_time_claim(
-        "iat",
-        claims,
-        |timestamp| {
-            println!(
-                "Issued at: {} ({} seconds ago)",
-                format_timestamp(timestamp),
-                now - timestamp
-            );
-        },
-        None::<fn()>,
-    );
+    if let Some(iat) = time_claim(claims, "iat") {
+        println!(
+            "Issued at: {} ({} seconds ago)",
+            format_timestamp(iat),
+            now - iat
+        );
+    }
 
     println!();
 }
 
-fn print_time_claim<F, M>(
-    name: &str,
-    claims: &Map<String, Value>,
-    on_found: F,
-    on_missing: Option<M>,
-) where
-    F: FnOnce(i64),
-    M: FnOnce(),
-{
-    let Some(value) = claims.get(name) else {
-        if let Some(on_missing) = on_missing {
-            on_missing();
-        }
-        return;
-    };
-
-    match try_parse_timestamp(value) {
-        Some(timestamp) => on_found(timestamp),
-        None => println!("Unrecognized {name} value: {value}"),
+fn time_claim(claims: &Map<String, Value>, name: &str) -> Option<i64> {
+    let value = claims.get(name)?;
+    let timestamp = try_parse_timestamp(value);
+    if timestamp.is_none() {
+        println!("Unrecognized {name} value: {value}");
     }
+    timestamp
 }
 
 fn try_parse_timestamp(value: &Value) -> Option<i64> {
