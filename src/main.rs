@@ -59,8 +59,7 @@ fn process_input_tokens(flags: &cli::Flags, args: &[String]) -> i32 {
         [arg] if arg == "-" => process_from_stdin(flags, true),
         _ => {
             for token in args {
-                let token = parser::normalize_token_string(token, flags.strict);
-                let exit_code = process_token(&token, flags);
+                let exit_code = process_token(token, flags);
                 if exit_code != EXIT_SUCCESS {
                     return exit_code;
                 }
@@ -70,8 +69,8 @@ fn process_input_tokens(flags: &cli::Flags, args: &[String]) -> i32 {
     }
 }
 
-fn process_token(token: &str, flags: &cli::Flags) -> i32 {
-    let parsed = match parser::parse_token(token) {
+fn process_token(input: &str, flags: &cli::Flags) -> i32 {
+    let parsed = match parser::resolve_token(input, flags.strict) {
         Ok(parsed) => parsed,
         Err(err) => {
             eprintln!("Error: {err}");
@@ -151,13 +150,13 @@ fn process_from_stdin(flags: &cli::Flags, explicit: bool) -> i32 {
             }
         };
 
-        let line = parser::normalize_token_string(&line, flags.strict);
+        let line = line.trim();
         if line.is_empty() {
             continue;
         }
 
         has_token = true;
-        let exit_code = process_token(&line, flags);
+        let exit_code = process_token(line, flags);
         if exit_code != EXIT_SUCCESS {
             return exit_code;
         }

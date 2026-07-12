@@ -54,20 +54,17 @@ pub fn parse_token(token: &str) -> Result<ParsedToken, ParseError> {
     })
 }
 
-pub fn normalize_token_string(s: &str, strict: bool) -> String {
-    let s = s.trim();
-    if s.is_empty() || strict {
-        return s.to_string();
-    }
-
-    for candidate in JWT_PATTERN.find_iter(s) {
-        let candidate = candidate.as_str();
-        if parse_token(candidate).is_ok() {
-            return candidate.to_string();
+pub fn resolve_token(input: &str, strict: bool) -> Result<ParsedToken, ParseError> {
+    let input = input.trim();
+    if !strict {
+        for candidate in JWT_PATTERN.find_iter(input) {
+            if let Ok(parsed) = parse_token(candidate.as_str()) {
+                return Ok(parsed);
+            }
         }
     }
 
-    s.to_string()
+    parse_token(input)
 }
 
 fn decode_json_object(
@@ -167,18 +164,20 @@ mod tests {
             encode_segment(r#"{"sub":"Troy Barnes"}"#)
         );
 
-        assert_eq!(
-            token,
-            normalize_token_string(&format!("Bearer {token}"), false)
-        );
+        let parsed = resolve_token(&format!("Bearer {token}"), false).expect("extract token");
+        assert_eq!(token, parsed.raw);
     }
 
     #[test]
-    fn strict_mode_only_trims() {
-        assert_eq!(
-            "Bearer not.a.jwt",
-            normalize_token_string("  Bearer not.a.jwt  ", true)
+    fn strict_mode_trims_but_does_not_extract() {
+        let token = format!(
+            "{}.{}.",
+            encode_segment(r#"{"alg":"none","typ":"JWT"}"#),
+            encode_segment(r#"{"sub":"Troy Barnes"}"#)
         );
+
+        assert!(resolve_token(&format!("  {token}  "), true).is_ok());
+        assert!(resolve_token(&format!("Bearer {token}"), true).is_err());
     }
 
     #[test]
