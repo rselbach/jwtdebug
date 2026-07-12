@@ -92,24 +92,12 @@ pub struct Flags {
     pub expiration: bool,
     pub ignore_expiration: bool,
     pub verify_signature: bool,
-    pub show_all: bool,
     pub show_version: bool,
     pub show_help: bool,
     pub quiet: bool,
     pub verbose: bool,
     pub raw_claims: bool,
     pub strict: bool,
-}
-
-impl Flags {
-    pub fn apply_all_flag(&mut self) {
-        if self.show_all {
-            self.header = true;
-            self.claims = true;
-            self.signature = true;
-            self.expiration = true;
-        }
-    }
 }
 
 pub fn parse<I, T>(args: I) -> Result<(Flags, Vec<String>), clap::Error>
@@ -137,13 +125,12 @@ where
     Ok((
         Flags {
             key_file,
-            header: args.header,
-            claims: args.claims,
-            signature: args.signature,
-            expiration,
+            header: args.header || args.show_all,
+            claims: args.claims || args.show_all,
+            signature: args.signature || args.show_all,
+            expiration: expiration || args.show_all,
             ignore_expiration,
             verify_signature: args.verify_signature,
-            show_all: args.show_all,
             show_version: args.show_version,
             show_help: args.show_help,
             quiet: args.quiet,
@@ -265,8 +252,7 @@ mod tests {
 
     #[test]
     fn all_flag_enables_everything() {
-        let (mut flags, _) = parse(["--all"]).expect("parse flags");
-        flags.apply_all_flag();
+        let (flags, _) = parse(["--all"]).expect("parse flags");
 
         assert!(flags.header);
         assert!(flags.claims);

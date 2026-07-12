@@ -22,7 +22,7 @@ where
     I: IntoIterator<Item = T>,
     T: Into<std::ffi::OsString> + Clone,
 {
-    let (mut flags, positional_args) = match cli::parse(args) {
+    let (flags, positional_args) = match cli::parse(args) {
         Ok(parsed) => parsed,
         Err(err) => {
             eprint!("{err}");
@@ -44,7 +44,6 @@ where
         return EXIT_SUCCESS;
     }
 
-    flags.apply_all_flag();
     process_input_tokens(&flags, &positional_args)
 }
 
