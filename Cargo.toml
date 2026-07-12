@@ -10,9 +10,10 @@ repository = "https://github.com/rselbach/jwtdebug"
 base64 = "0.22.1"
 clap = { version = "4.5.51", features = ["derive"] }
 jsonwebtoken = "9.3.1"
+# pre-release pin: jsonwebtoken has no ES512 support; switch to the stable
+# 0.14 release once it ships
 p521 = "0.14.0-rc.9"
 regex = "1.12.2"
-serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.145", features = ["preserve_order"] }
 thiserror = "2.0.17"
 time = { version = "0.3.44", features = ["formatting", "local-offset", "parsing"] }
