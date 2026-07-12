@@ -185,26 +185,19 @@ fn validate_time_claims(payload: &str) -> Result<(), VerificationError> {
         .duration_since(UNIX_EPOCH)
         .map_or(0, |duration| duration.as_secs() as i64);
 
-    if let Some(exp) = claims.get("exp").and_then(value_as_i64) {
+    if let Some(exp) = claims.get("exp").and_then(Value::as_i64) {
         if now - exp > LEEWAY_SECONDS {
             return Err(VerificationError::TokenExpired);
         }
     }
 
-    if let Some(nbf) = claims.get("nbf").and_then(value_as_i64) {
+    if let Some(nbf) = claims.get("nbf").and_then(Value::as_i64) {
         if nbf - now > LEEWAY_SECONDS {
             return Err(VerificationError::TokenNotValidYet);
         }
     }
 
     Ok(())
-}
-
-fn value_as_i64(value: &Value) -> Option<i64> {
-    match value {
-        Value::Number(number) => number.as_i64(),
-        _ => None,
-    }
 }
 
 #[cfg(test)]
