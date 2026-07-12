@@ -25,12 +25,10 @@ where
     let (flags, positional_args) = match cli::parse(args) {
         Ok(parsed) => parsed,
         Err(err) => {
+            // clap's auto help/version are disabled (cli handles them as
+            // regular flags), so every parse failure here is a real error.
             eprint!("{err}");
-            return if err.use_stderr() {
-                EXIT_ERROR
-            } else {
-                EXIT_SUCCESS
-            };
+            return EXIT_ERROR;
         }
     };
 
