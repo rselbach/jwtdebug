@@ -12,6 +12,7 @@ use serde_json::{Map, Value};
 use thiserror::Error;
 
 use crate::constants::MAX_FILE_SIZE_BYTES;
+use crate::parser::ParsedToken;
 
 // Clock-skew tolerance for exp/nbf, matching jsonwebtoken's default so the
 // hand-rolled ES512 path behaves like every other algorithm.
@@ -44,12 +45,6 @@ pub enum VerificationError {
     #[error("unexpected signing method: {0}")]
     UnexpectedAlgorithm(String),
 
-    #[error("invalid token format: expected 3 parts separated by '.', got {0}")]
-    InvalidTokenParts(usize),
-
-    #[error("failed to decode token payload: {0}")]
-    DecodePayload(#[source] Box<dyn std::error::Error + Send + Sync>),
-
     #[error("failed to decode token signature: {0}")]
     DecodeSignature(#[source] base64::DecodeError),
 
@@ -76,8 +71,7 @@ pub enum VerificationError {
 }
 
 pub fn verify_token_signature(
-    token: &str,
-    header: &Map<String, Value>,
+    parsed: &ParsedToken,
     key_file: Option<&str>,
     ignore_expiration: bool,
 ) -> Result<(), VerificationError> {
@@ -94,12 +88,13 @@ pub fn verify_token_signature(
     }
 
     let key_data = fs::read(key_file).map_err(VerificationError::ReadKeyFile)?;
-    let algorithm_name = header
+    let algorithm_name = parsed
+        .header
         .get("alg")
         .and_then(Value::as_str)
         .ok_or_else(|| VerificationError::UnexpectedAlgorithm("<missing>".to_string()))?;
     if algorithm_name == "ES512" {
-        return verify_es512(token, &key_data, ignore_expiration);
+        return verify_es512(parsed, &key_data, ignore_expiration);
     }
 
     let algorithm = Algorithm::from_str(algorithm_name)
@@ -114,7 +109,7 @@ pub fn verify_token_signature(
     validation.validate_exp = !ignore_expiration;
     validation.validate_nbf = !ignore_expiration;
 
-    decode::<Value>(token, &key, &validation)?;
+    decode::<Value>(&parsed.raw, &key, &validation)?;
     Ok(())
 }
 
@@ -146,41 +141,35 @@ fn decoding_key(algorithm: Algorithm, key_data: &[u8]) -> Result<DecodingKey, Ve
 }
 
 fn verify_es512(
-    token: &str,
+    parsed: &ParsedToken,
     key_data: &[u8],
     ignore_expiration: bool,
 ) -> Result<(), VerificationError> {
-    let parts = token.split('.').collect::<Vec<_>>();
-    if parts.len() != 3 {
-        return Err(VerificationError::InvalidTokenParts(parts.len()));
-    }
-
     let signature = URL_SAFE_NO_PAD
-        .decode(parts[2])
+        .decode(&parsed.signature)
         .map_err(VerificationError::DecodeSignature)?;
     let signature = Signature::from_slice(&signature).map_err(VerificationError::Es512Signature)?;
     let key_pem = std::str::from_utf8(key_data).map_err(VerificationError::KeyFileNotUtf8)?;
     let verifying_key =
         VerifyingKey::from_public_key_pem(key_pem).map_err(VerificationError::Es512Key)?;
 
-    let signing_input = format!("{}.{}", parts[0], parts[1]);
+    let signing_input = parsed
+        .raw
+        .rsplit_once('.')
+        .map(|(input, _)| input)
+        .expect("ParsedToken raw always has three segments");
     verifying_key
         .verify(signing_input.as_bytes(), &signature)
         .map_err(|_| VerificationError::SignatureInvalid)?;
 
     if !ignore_expiration {
-        validate_time_claims(parts[1])?;
+        validate_time_claims(&parsed.claims)?;
     }
 
     Ok(())
 }
 
-fn validate_time_claims(payload: &str) -> Result<(), VerificationError> {
-    let data = URL_SAFE_NO_PAD
-        .decode(payload)
-        .map_err(|err| VerificationError::DecodePayload(Box::new(err)))?;
-    let claims = serde_json::from_slice::<Value>(&data)
-        .map_err(|err| VerificationError::DecodePayload(Box::new(err)))?;
+fn validate_time_claims(claims: &Map<String, Value>) -> Result<(), VerificationError> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |duration| duration.as_secs() as i64);
@@ -242,8 +231,7 @@ mod tests {
         let parsed = parser::parse_token(&token).expect("parse token");
 
         let err = verify_token_signature(
-            &token,
-            &parsed.header,
+            &parsed,
             Some(key_file.path().to_str().expect("utf-8 path")),
             false,
         );
@@ -276,8 +264,7 @@ mod tests {
         let parsed = parser::parse_token(&token).expect("parse token");
 
         let err = verify_token_signature(
-            &token,
-            &parsed.header,
+            &parsed,
             Some(key_file.path().to_str().expect("utf-8 path")),
             false,
         );
@@ -312,11 +299,11 @@ mod tests {
         let key_file = key_file.path().to_str().expect("utf-8 path");
         let parsed = parser::parse_token(&token).expect("parse token");
 
-        let err = verify_token_signature(&token, &parsed.header, Some(key_file), false)
-            .expect_err("expired token");
+        let err =
+            verify_token_signature(&parsed, Some(key_file), false).expect_err("expired token");
         assert!(matches!(err, VerificationError::TokenExpired));
 
-        let err = verify_token_signature(&token, &parsed.header, Some(key_file), true);
+        let err = verify_token_signature(&parsed, Some(key_file), true);
         assert!(
             err.is_ok(),
             "expected expired ES512 token to pass with ignore-expiration: {err:?}"

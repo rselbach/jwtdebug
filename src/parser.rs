@@ -13,9 +13,10 @@ static JWT_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParsedToken {
+    pub raw: String,
     pub header: Map<String, Value>,
     pub claims: Map<String, Value>,
-    pub parts: Vec<String>,
+    pub signature: String,
 }
 
 #[derive(Debug, Error)]
@@ -34,7 +35,7 @@ pub enum ParseError {
 }
 
 pub fn parse_token(token: &str) -> Result<ParsedToken, ParseError> {
-    let parts = token.split('.').map(str::to_string).collect::<Vec<_>>();
+    let parts = token.split('.').collect::<Vec<_>>();
     if parts.len() != 3 {
         return Err(ParseError::InvalidFormat {
             part_count: parts.len(),
@@ -42,13 +43,14 @@ pub fn parse_token(token: &str) -> Result<ParsedToken, ParseError> {
         });
     }
 
-    let header = decode_json_object(&parts[0], token, "header")?;
-    let claims = decode_json_object(&parts[1], token, "claims")?;
+    let header = decode_json_object(parts[0], token, "header")?;
+    let claims = decode_json_object(parts[1], token, "claims")?;
 
     Ok(ParsedToken {
+        raw: token.to_string(),
         header,
         claims,
-        parts,
+        signature: parts[2].to_string(),
     })
 }
 

@@ -84,8 +84,7 @@ fn process_token(token: &str, flags: &cli::Flags) -> i32 {
 
     if flags.verify_signature {
         if let Err(err) = verification::verify_token_signature(
-            token,
-            &parsed.header,
+            &parsed,
             flags.key_file.as_deref(),
             flags.ignore_expiration,
         ) {
@@ -118,7 +117,7 @@ fn process_token(token: &str, flags: &cli::Flags) -> i32 {
     }
 
     if flags.signature {
-        printer::print_signature(&parsed.parts[2]);
+        printer::print_signature(&parsed.signature);
     }
 
     if flags.expiration {
