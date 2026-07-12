@@ -29,8 +29,8 @@ pub enum ParseError {
         source: Box<dyn std::error::Error + Send + Sync>,
     },
 
-    #[error("could not extract claims from token")]
-    ClaimsNotObject,
+    #[error("token {segment} is not a JSON object")]
+    NotAnObject { segment: &'static str },
 }
 
 pub fn parse_token(token: &str) -> Result<ParsedToken, ParseError> {
@@ -42,8 +42,8 @@ pub fn parse_token(token: &str) -> Result<ParsedToken, ParseError> {
         });
     }
 
-    let header = decode_json_object(&parts[0], token)?;
-    let claims = decode_json_object(&parts[1], token)?;
+    let header = decode_json_object(&parts[0], token, "header")?;
+    let claims = decode_json_object(&parts[1], token, "claims")?;
 
     Ok(ParsedToken {
         header,
@@ -68,7 +68,11 @@ pub fn normalize_token_string(s: &str, strict: bool) -> String {
     s.to_string()
 }
 
-fn decode_json_object(segment: &str, token: &str) -> Result<Map<String, Value>, ParseError> {
+fn decode_json_object(
+    segment: &str,
+    token: &str,
+    segment_name: &'static str,
+) -> Result<Map<String, Value>, ParseError> {
     let data = URL_SAFE_NO_PAD
         .decode(segment)
         .map_err(|source| ParseError::Decode {
@@ -81,7 +85,9 @@ fn decode_json_object(segment: &str, token: &str) -> Result<Map<String, Value>, 
         source: Box::new(source),
     })? {
         Value::Object(obj) => Ok(obj),
-        _ => Err(ParseError::ClaimsNotObject),
+        _ => Err(ParseError::NotAnObject {
+            segment: segment_name,
+        }),
     }
 }
 
@@ -125,6 +131,18 @@ mod tests {
     fn rejects_invalid_part_count() {
         let err = parse_token("invalid.token").expect_err("invalid token");
         assert!(err.to_string().contains("invalid token format"));
+    }
+
+    #[test]
+    fn non_object_header_names_the_segment() {
+        let token = format!(
+            "{}.{}.",
+            encode_segment("[1,2,3]"),
+            encode_segment(r#"{"sub":"Abed Nadir"}"#)
+        );
+
+        let err = parse_token(&token).expect_err("header is not an object");
+        assert_eq!("token header is not a JSON object", err.to_string());
     }
 
     #[test]
