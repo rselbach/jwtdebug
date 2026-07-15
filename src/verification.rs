@@ -16,7 +16,7 @@ use crate::parser::ParsedToken;
 
 // Clock-skew tolerance for exp/nbf, matching jsonwebtoken's default so the
 // hand-rolled ES512 path behaves like every other algorithm.
-const LEEWAY_SECONDS: i64 = 60;
+const LEEWAY_SECONDS: u64 = 60;
 
 const MIN_HMAC_KEY_LEN_HS256: usize = 32;
 const MIN_HMAC_KEY_LEN_HS384: usize = 48;
@@ -187,21 +187,34 @@ fn verify_es512(
 fn validate_time_claims(claims: &Map<String, Value>) -> Result<(), VerificationError> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_or(0, |duration| duration.as_secs() as i64);
+        .map_or(0, |duration| duration.as_secs());
 
-    if let Some(exp) = claims.get("exp").and_then(Value::as_i64) {
-        if now - exp > LEEWAY_SECONDS {
+    if let Some(exp) = claims.get("exp").and_then(numeric_date) {
+        if exp < now.saturating_sub(LEEWAY_SECONDS) {
             return Err(VerificationError::TokenExpired);
         }
     }
 
-    if let Some(nbf) = claims.get("nbf").and_then(Value::as_i64) {
-        if nbf - now > LEEWAY_SECONDS {
+    if let Some(nbf) = claims.get("nbf").and_then(numeric_date) {
+        if nbf > now.saturating_add(LEEWAY_SECONDS) {
             return Err(VerificationError::TokenNotValidYet);
         }
     }
 
     Ok(())
+}
+
+fn numeric_date(value: &Value) -> Option<u64> {
+    if let Some(value) = value.as_u64() {
+        return Some(value);
+    }
+
+    let value = value.as_f64()?;
+    if !value.is_finite() || value < 0.0 || value >= u64::MAX as f64 {
+        return None;
+    }
+
+    Some(value.round() as u64)
 }
 
 #[cfg(test)]
@@ -215,10 +228,50 @@ mod tests {
     use p521::ecdsa::{Signature, SigningKey};
     use p521::elliptic_curve::Generate;
     use p521::pkcs8::{EncodePublicKey, LineEnding};
+    use serde_json::json;
     use tempfile::NamedTempFile;
 
     use super::*;
     use crate::parser;
+
+    #[test]
+    fn rejects_expired_fractional_numeric_date() {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time after epoch")
+            .as_secs();
+        let claims = json!({ "exp": now as f64 - 3600.5 });
+
+        let err = validate_time_claims(claims.as_object().expect("claims object"))
+            .expect_err("expired token");
+
+        assert!(matches!(err, VerificationError::TokenExpired));
+    }
+
+    #[test]
+    fn rejects_future_fractional_numeric_date() {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time after epoch")
+            .as_secs();
+        let claims = json!({ "nbf": now as f64 + 3600.5 });
+
+        let err = validate_time_claims(claims.as_object().expect("claims object"))
+            .expect_err("token not valid yet");
+
+        assert!(matches!(err, VerificationError::TokenNotValidYet));
+    }
+
+    #[test]
+    fn handles_unsigned_numeric_dates_without_overflow() {
+        let future_exp = json!({ "exp": u64::MAX });
+        assert!(validate_time_claims(future_exp.as_object().expect("claims object")).is_ok());
+
+        let future_nbf = json!({ "nbf": u64::MAX });
+        let err = validate_time_claims(future_nbf.as_object().expect("claims object"))
+            .expect_err("token not valid yet");
+        assert!(matches!(err, VerificationError::TokenNotValidYet));
+    }
 
     #[test]
     fn verifies_es512_token() {
