@@ -39,6 +39,9 @@ pub enum VerificationError {
     #[error("failed to read key file: {0}")]
     ReadKeyFile(#[source] std::io::Error),
 
+    #[error("HMAC key file contains an asymmetric key")]
+    HmacKeyIsAsymmetric,
+
     #[error("HMAC key too short: {actual} bytes (minimum {minimum} bytes)")]
     HmacKeyTooShort { actual: usize, minimum: usize },
 
@@ -116,6 +119,10 @@ pub fn verify_token_signature(
 fn decoding_key(algorithm: Algorithm, key_data: &[u8]) -> Result<DecodingKey, VerificationError> {
     match algorithm {
         Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => {
+            if is_asymmetric_key(key_data) {
+                return Err(VerificationError::HmacKeyIsAsymmetric);
+            }
+
             let min_len = match algorithm {
                 Algorithm::HS256 => MIN_HMAC_KEY_LEN_HS256,
                 Algorithm::HS384 => MIN_HMAC_KEY_LEN_HS384,
@@ -138,6 +145,14 @@ fn decoding_key(algorithm: Algorithm, key_data: &[u8]) -> Result<DecodingKey, Ve
         Algorithm::ES256 | Algorithm::ES384 => Ok(DecodingKey::from_ec_pem(key_data)?),
         Algorithm::EdDSA => Ok(DecodingKey::from_ed_pem(key_data)?),
     }
+}
+
+fn is_asymmetric_key(key_data: &[u8]) -> bool {
+    DecodingKey::from_rsa_pem(key_data).is_ok()
+        || DecodingKey::from_ec_pem(key_data).is_ok()
+        || DecodingKey::from_ed_pem(key_data).is_ok()
+        || std::str::from_utf8(key_data)
+            .is_ok_and(|key_pem| VerifyingKey::from_public_key_pem(key_pem).is_ok())
 }
 
 fn verify_es512(

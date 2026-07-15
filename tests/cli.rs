@@ -520,6 +520,31 @@ fn unreadable_key_file_exits_3() {
 }
 
 #[test]
+fn asymmetric_public_keys_cannot_be_used_as_hmac_secrets() {
+    for public_key in [RSA_PUBLIC_KEY, EC_PUBLIC_KEY, ED_PUBLIC_KEY] {
+        let token = hmac_token(
+            public_key.as_bytes(),
+            json!({ "sub": "Forged Human Being" }),
+        );
+        let key_file = key_file(public_key.as_bytes());
+
+        Command::cargo_bin("jwtdebug")
+            .expect("binary exists")
+            .args([
+                "--verify",
+                "--key-file",
+                key_file.path().to_str().expect("utf-8 path"),
+                &token,
+            ])
+            .assert()
+            .code(3)
+            .stderr(predicate::str::contains(
+                "HMAC key file contains an asymmetric key",
+            ));
+    }
+}
+
+#[test]
 fn short_hmac_key_exits_3() {
     let secret = b"test-secret-key-at-least-32-bytes-long!";
     let token = hmac_token(secret, json!({ "sub": "Short HMAC Key" }));
