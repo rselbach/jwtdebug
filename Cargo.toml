@@ -9,7 +9,7 @@ repository = "https://github.com/rselbach/jwtdebug"
 [dependencies]
 base64 = "0.22.1"
 clap = { version = "4.5.51", features = ["derive"] }
-jsonwebtoken = "9.3.1"
+jsonwebtoken = "10.4.0"
 # pre-release pin: jsonwebtoken has no ES512 support; switch to the stable
 # 0.14 release once it ships
 p521 = "0.14.0-rc.9"
