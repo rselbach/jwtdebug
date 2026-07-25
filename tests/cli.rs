@@ -617,7 +617,7 @@ fn expired_hmac_token_fails_unless_ignored() {
         ])
         .assert()
         .code(3)
-        .stderr(predicate::str::contains("ExpiredSignature"));
+        .stderr(predicate::str::contains("token is expired"));
 
     Command::cargo_bin("jwtdebug")
         .expect("binary exists")
@@ -631,6 +631,63 @@ fn expired_hmac_token_fails_unless_ignored() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Signature verified successfully"));
+}
+
+#[test]
+fn string_exp_is_enforced_during_verify() {
+    let secret = b"test-secret-key-at-least-32-bytes-long!";
+    let token = hmac_token(secret, json!({ "sub": "String Exp", "exp": "1000000000" }));
+    let key_file = key_file(secret);
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args([
+            "--verify",
+            "--key-file",
+            key_file.path().to_str().expect("utf-8 path"),
+            &token,
+        ])
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains("token is expired"));
+}
+
+#[test]
+fn string_nbf_is_enforced_during_verify() {
+    let secret = b"test-secret-key-at-least-32-bytes-long!";
+    let token = hmac_token(secret, json!({ "sub": "String Nbf", "nbf": "2000000000" }));
+    let key_file = key_file(secret);
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args([
+            "--verify",
+            "--key-file",
+            key_file.path().to_str().expect("utf-8 path"),
+            &token,
+        ])
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains("token is not valid yet"));
+}
+
+#[test]
+fn malformed_exp_fails_verify() {
+    let secret = b"test-secret-key-at-least-32-bytes-long!";
+    let token = hmac_token(secret, json!({ "sub": "Bad Exp", "exp": true }));
+    let key_file = key_file(secret);
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args([
+            "--verify",
+            "--key-file",
+            key_file.path().to_str().expect("utf-8 path"),
+            &token,
+        ])
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains("invalid exp claim"));
 }
 
 #[test]
