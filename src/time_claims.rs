@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use serde_json::Value;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
@@ -25,6 +27,14 @@ impl NumericDate {
         match self {
             Self::Integer(value) => value > i128::from(timestamp),
             Self::Fractional(value) => value > timestamp as f64,
+        }
+    }
+
+    /// Return whether this date is after a duration since the Unix epoch.
+    pub fn is_after_unix_time(self, timestamp: Duration) -> bool {
+        match self {
+            Self::Integer(value) => value > i128::from(timestamp.as_secs()),
+            Self::Fractional(value) => value > timestamp.as_secs_f64(),
         }
     }
 
@@ -132,6 +142,14 @@ mod tests {
             Some(NumericDate::Fractional(1_700_000_000.5)),
             parse_numeric_date(&json!(1_700_000_000.5))
         );
+    }
+
+    #[test]
+    fn compares_fractional_dates_with_subsecond_unix_time() {
+        let now = Duration::new(1_700_000_000, 750_000_000);
+
+        assert!(!NumericDate::Fractional(1_700_000_000.5).is_after_unix_time(now));
+        assert!(NumericDate::Fractional(1_700_000_000.9).is_after_unix_time(now));
     }
 
     #[test]
