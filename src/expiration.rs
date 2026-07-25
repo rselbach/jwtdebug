@@ -14,15 +14,15 @@ pub fn check_expiration(claims: &Map<String, Value>) {
 
     println!("EXPIRATION:");
     match classify_time_claim(claims, "exp") {
-        TimeClaim::Valid(exp) if now >= exp => println!(
+        TimeClaim::Valid(exp) if !exp.is_after(now) => println!(
             "Token expired at {} ({} seconds ago)",
-            format_timestamp(exp),
-            now_wide - i128::from(exp)
+            format_timestamp(exp.rounded_seconds()),
+            now_wide - exp.rounded_seconds()
         ),
         TimeClaim::Valid(exp) => println!(
             "Token expires at {} ({} seconds from now)",
-            format_timestamp(exp),
-            i128::from(exp) - now_wide
+            format_timestamp(exp.rounded_seconds()),
+            exp.rounded_seconds() - now_wide
         ),
         TimeClaim::Absent => println!("No expiration claim found"),
         TimeClaim::Invalid => {
@@ -33,15 +33,15 @@ pub fn check_expiration(claims: &Map<String, Value>) {
     }
 
     match classify_time_claim(claims, "nbf") {
-        TimeClaim::Valid(nbf) if now < nbf => println!(
+        TimeClaim::Valid(nbf) if nbf.is_after(now) => println!(
             "Token not valid yet. Valid from {} (in {} seconds)",
-            format_timestamp(nbf),
-            i128::from(nbf) - now_wide
+            format_timestamp(nbf.rounded_seconds()),
+            nbf.rounded_seconds() - now_wide
         ),
         TimeClaim::Valid(nbf) => println!(
             "Token valid since {} ({} seconds ago)",
-            format_timestamp(nbf),
-            now_wide - i128::from(nbf)
+            format_timestamp(nbf.rounded_seconds()),
+            now_wide - nbf.rounded_seconds()
         ),
         TimeClaim::Invalid => {
             if let Some(value) = claims.get("nbf") {
@@ -54,8 +54,8 @@ pub fn check_expiration(claims: &Map<String, Value>) {
     match classify_time_claim(claims, "iat") {
         TimeClaim::Valid(iat) => println!(
             "Issued at: {} ({} seconds ago)",
-            format_timestamp(iat),
-            now_wide - i128::from(iat)
+            format_timestamp(iat.rounded_seconds()),
+            now_wide - iat.rounded_seconds()
         ),
         TimeClaim::Invalid => {
             if let Some(value) = claims.get("iat") {
@@ -68,7 +68,10 @@ pub fn check_expiration(claims: &Map<String, Value>) {
     println!();
 }
 
-fn format_timestamp(timestamp: i64) -> String {
+fn format_timestamp(timestamp: i128) -> String {
+    let Ok(timestamp) = i64::try_from(timestamp) else {
+        return timestamp.to_string();
+    };
     let Ok(datetime) = OffsetDateTime::from_unix_timestamp(timestamp) else {
         return timestamp.to_string();
     };
@@ -84,12 +87,12 @@ fn format_timestamp(timestamp: i64) -> String {
 mod tests {
     use serde_json::json;
 
-    use crate::time_claims::parse_numeric_date;
+    use crate::time_claims::{parse_numeric_date, NumericDate};
 
     #[test]
     fn parses_float_numeric_dates_for_display() {
         assert_eq!(
-            Some(1_700_000_000),
+            Some(NumericDate::Fractional(1_700_000_000.0)),
             parse_numeric_date(&json!(1_700_000_000.0))
         );
     }

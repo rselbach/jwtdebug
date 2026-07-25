@@ -198,6 +198,10 @@ fn validate_time_claims(claims: &Map<String, Value>) -> Result<(), VerificationE
         .duration_since(UNIX_EPOCH)
         .map_or(0, |duration| duration.as_secs() as i64);
 
+    validate_time_claims_at(claims, now)
+}
+
+fn validate_time_claims_at(claims: &Map<String, Value>, now: i64) -> Result<(), VerificationError> {
     match classify_time_claim(claims, "exp") {
         TimeClaim::Absent => {}
         TimeClaim::Invalid => {
@@ -209,7 +213,7 @@ fn validate_time_claims(claims: &Map<String, Value>) -> Result<(), VerificationE
                     .unwrap_or_else(|| "<missing>".to_string()),
             });
         }
-        TimeClaim::Valid(exp) if exp < now.saturating_sub(LEEWAY_SECONDS) => {
+        TimeClaim::Valid(exp) if exp.is_before(now.saturating_sub(LEEWAY_SECONDS)) => {
             return Err(VerificationError::TokenExpired);
         }
         TimeClaim::Valid(_) => {}
@@ -226,7 +230,7 @@ fn validate_time_claims(claims: &Map<String, Value>) -> Result<(), VerificationE
                     .unwrap_or_else(|| "<missing>".to_string()),
             });
         }
-        TimeClaim::Valid(nbf) if nbf > now.saturating_add(LEEWAY_SECONDS) => {
+        TimeClaim::Valid(nbf) if nbf.is_after(now.saturating_add(LEEWAY_SECONDS)) => {
             return Err(VerificationError::TokenNotValidYet);
         }
         TimeClaim::Valid(_) => {}
@@ -277,6 +281,20 @@ mod tests {
         let err = validate_time_claims(claims.as_object().expect("claims object"))
             .expect_err("token not valid yet");
 
+        assert!(matches!(err, VerificationError::TokenNotValidYet));
+    }
+
+    #[test]
+    fn enforces_fractional_numeric_dates_at_leeway_boundary() {
+        let now = 1_700_000_000;
+        let expired = json!({ "exp": 1_699_999_939.6 });
+        let err = validate_time_claims_at(expired.as_object().expect("claims object"), now)
+            .expect_err("fractional exp is below the leeway boundary");
+        assert!(matches!(err, VerificationError::TokenExpired));
+
+        let immature = json!({ "nbf": 1_700_000_060.4 });
+        let err = validate_time_claims_at(immature.as_object().expect("claims object"), now)
+            .expect_err("fractional nbf is above the leeway boundary");
         assert!(matches!(err, VerificationError::TokenNotValidYet));
     }
 
