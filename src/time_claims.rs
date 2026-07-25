@@ -71,10 +71,7 @@ pub fn parse_numeric_date(value: &Value) -> Option<NumericDate> {
                 return Some(NumericDate::Integer(i128::from(timestamp)));
             }
             if let Some(timestamp) = number.as_u64() {
-                return i64::try_from(timestamp)
-                    .ok()
-                    .map(i128::from)
-                    .map(NumericDate::Integer);
+                return Some(NumericDate::Integer(i128::from(timestamp)));
             }
             let timestamp = number.as_f64()?;
             if !timestamp.is_finite() {
@@ -110,6 +107,14 @@ mod tests {
         assert_eq!(
             Some(NumericDate::Integer(1_700_000_000)),
             parse_numeric_date(&json!(1_700_000_000))
+        );
+    }
+
+    #[test]
+    fn parses_maximum_unsigned_integer() {
+        assert_eq!(
+            Some(NumericDate::Integer(i128::from(u64::MAX))),
+            parse_numeric_date(&json!(u64::MAX))
         );
     }
 

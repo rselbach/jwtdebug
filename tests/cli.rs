@@ -222,6 +222,23 @@ fn expiration_report_accepts_float_numeric_dates() {
 }
 
 #[test]
+fn expiration_report_accepts_maximum_unsigned_timestamp() {
+    let token = unsigned_token(json!({
+        "sub": "Troy Barnes",
+        "exp": u64::MAX,
+    }));
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args(["--expiration", "--claims=false", "--quiet", &token])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Token expires at 18446744073709551615",
+        ));
+}
+
+#[test]
 fn expiration_report_handles_minimum_timestamp() {
     let token = unsigned_token(json!({
         "sub": "Pierce Hawthorne",
@@ -677,6 +694,25 @@ fn expired_hmac_token_fails_unless_ignored() {
         .args([
             "--verify",
             "--ignore-expiration",
+            "--key-file",
+            key_file.path().to_str().expect("utf-8 path"),
+            &token,
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Signature verified successfully"));
+}
+
+#[test]
+fn maximum_unsigned_exp_verifies_successfully() {
+    let secret = b"test-secret-key-at-least-32-bytes-long!";
+    let token = hmac_token(secret, json!({ "sub": "Troy Barnes", "exp": u64::MAX }));
+    let key_file = key_file(secret);
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args([
+            "--verify",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,

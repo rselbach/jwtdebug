@@ -347,6 +347,24 @@ mod tests {
     }
 
     #[test]
+    fn validates_maximum_unsigned_numeric_dates() {
+        let future_exp = json!({ "exp": u64::MAX });
+        assert!(validate_time_claims_at(
+            future_exp.as_object().expect("claims object"),
+            1_700_000_000,
+        )
+        .is_ok());
+
+        let future_nbf = json!({ "nbf": u64::MAX });
+        let err = validate_time_claims_at(
+            future_nbf.as_object().expect("claims object"),
+            1_700_000_000,
+        )
+        .expect_err("maximum unsigned nbf is in the future");
+        assert!(matches!(err, VerificationError::TokenNotValidYet));
+    }
+
+    #[test]
     fn verifies_es512_token() {
         let signing_key = SigningKey::generate();
         let public_key = signing_key
