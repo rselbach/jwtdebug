@@ -79,7 +79,17 @@ fn process_token(input: &str, flags: &cli::Flags) -> i32 {
         }
     };
 
+    log_verbose_parse(flags, input, &parsed);
+
     if flags.verify_signature {
+        log_verbose(
+            flags,
+            format!(
+                "verifying signature with key file {:?} (ignore-expiration={})",
+                flags.key_file.as_deref().unwrap_or(""),
+                flags.ignore_expiration
+            ),
+        );
         if let Err(err) = verification::verify_token_signature(
             &parsed,
             flags.key_file.as_deref(),
@@ -88,6 +98,7 @@ fn process_token(input: &str, flags: &cli::Flags) -> i32 {
             printer::print_verification_failure(&err);
             return EXIT_VERIFICATION_FAIL;
         }
+        log_verbose(flags, "signature verification succeeded");
     }
 
     if flags.raw_claims {
@@ -126,6 +137,39 @@ fn process_token(input: &str, flags: &cli::Flags) -> i32 {
     }
 
     EXIT_SUCCESS
+}
+
+fn log_verbose_parse(flags: &cli::Flags, input: &str, parsed: &parser::ParsedToken) {
+    if !flags.verbose {
+        return;
+    }
+
+    let trimmed = input.trim();
+    if trimmed != parsed.raw {
+        log_verbose(
+            flags,
+            format!(
+                "extracted JWT from input ({} bytes -> {} bytes)",
+                trimmed.len(),
+                parsed.raw.len()
+            ),
+        );
+    } else {
+        log_verbose(flags, format!("using token ({} bytes)", parsed.raw.len()));
+    }
+
+    let alg = parsed
+        .header
+        .get("alg")
+        .map(ToString::to_string)
+        .unwrap_or_else(|| "<missing>".to_string());
+    log_verbose(flags, format!("header alg={alg}"));
+}
+
+fn log_verbose(flags: &cli::Flags, message: impl AsRef<str>) {
+    if flags.verbose {
+        eprintln!("verbose: {}", message.as_ref());
+    }
 }
 
 fn process_from_stdin(flags: &cli::Flags, explicit: bool) -> i32 {

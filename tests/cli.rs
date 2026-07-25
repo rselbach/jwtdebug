@@ -179,6 +179,36 @@ fn quiet_suppresses_unverified_notice() {
 }
 
 #[test]
+fn verbose_logs_parse_and_verify_diagnostics_to_stderr() {
+    let secret = b"test-secret-key-at-least-32-bytes-long!";
+    let token = hmac_token(secret, json!({ "sub": "Verbose Test" }));
+    let key_file = key_file(secret);
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args([
+            "--verbose",
+            "--verify",
+            "--key-file",
+            key_file.path().to_str().expect("utf-8 path"),
+            &format!("Bearer {token}"),
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains(
+            "verbose: extracted JWT from input",
+        ))
+        .stderr(predicate::str::contains("verbose: header alg="))
+        .stderr(predicate::str::contains(
+            "verbose: verifying signature with key file",
+        ))
+        .stderr(predicate::str::contains(
+            "verbose: signature verification succeeded",
+        ))
+        .stdout(predicate::str::contains("Signature verified successfully"));
+}
+
+#[test]
 fn expiration_report_accepts_float_numeric_dates() {
     let token = unsigned_token(json!({ "sub": "Float Exp", "exp": 1_000_000_000.0 }));
 
