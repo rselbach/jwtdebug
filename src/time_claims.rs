@@ -63,7 +63,7 @@ pub fn classify_time_claim(claims: &serde_json::Map<String, Value>, name: &str) 
 ///
 /// Accepts JSON numbers (including fractional values), decimal integer strings,
 /// and RFC3339 timestamps. Rejects non-finite numbers, floats outside the
-/// representable signed timestamp range, and other JSON types.
+/// supported signed-to-unsigned timestamp range, and other JSON types.
 pub fn parse_numeric_date(value: &Value) -> Option<NumericDate> {
     match value {
         Value::Number(number) => {
@@ -77,7 +77,7 @@ pub fn parse_numeric_date(value: &Value) -> Option<NumericDate> {
             if !timestamp.is_finite() {
                 return None;
             }
-            if timestamp < i64::MIN as f64 || timestamp >= -(i64::MIN as f64) {
+            if timestamp < i64::MIN as f64 || timestamp >= u64::MAX as f64 {
                 return None;
             }
             Some(NumericDate::Fractional(timestamp))
@@ -131,6 +131,14 @@ mod tests {
         assert_eq!(
             Some(NumericDate::Fractional(1_700_000_000.5)),
             parse_numeric_date(&json!(1_700_000_000.5))
+        );
+    }
+
+    #[test]
+    fn parses_unsigned_range_float() {
+        assert_eq!(
+            Some(NumericDate::Fractional(1e19)),
+            parse_numeric_date(&json!(1e19))
         );
     }
 

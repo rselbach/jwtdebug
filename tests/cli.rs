@@ -723,6 +723,25 @@ fn maximum_unsigned_exp_verifies_successfully() {
 }
 
 #[test]
+fn unsigned_range_float_exp_verifies_successfully() {
+    let secret = b"test-secret-key-at-least-32-bytes-long!";
+    let token = hmac_token(secret, json!({ "sub": "Troy Barnes", "exp": 1e19 }));
+    let key_file = key_file(secret);
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args([
+            "--verify",
+            "--key-file",
+            key_file.path().to_str().expect("utf-8 path"),
+            &token,
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Signature verified successfully"));
+}
+
+#[test]
 fn string_exp_is_enforced_during_verify() {
     let secret = b"test-secret-key-at-least-32-bytes-long!";
     let token = hmac_token(secret, json!({ "sub": "String Exp", "exp": "1000000000" }));
