@@ -222,6 +222,29 @@ fn expiration_report_accepts_float_numeric_dates() {
 }
 
 #[test]
+fn expiration_report_handles_minimum_timestamp() {
+    let token = unsigned_token(json!({
+        "sub": "Pierce Hawthorne",
+        "exp": i64::MIN,
+        "nbf": i64::MIN,
+        "iat": i64::MIN,
+    }));
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args(["--expiration", "--claims=false", "--quiet", &token])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Token expired at -9223372036854775808",
+        ))
+        .stdout(predicate::str::contains(
+            "Token valid since -9223372036854775808",
+        ))
+        .stdout(predicate::str::contains("Issued at: -9223372036854775808"));
+}
+
+#[test]
 fn multiple_token_arguments_are_processed_in_order() {
     let first = unsigned_token(json!({ "sub": "First Token" }));
     let second = unsigned_token(json!({ "sub": "Second Token" }));

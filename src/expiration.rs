@@ -10,18 +10,19 @@ pub fn check_expiration(claims: &Map<String, Value>) {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |duration| duration.as_secs() as i64);
+    let now_wide = i128::from(now);
 
     println!("EXPIRATION:");
     match classify_time_claim(claims, "exp") {
         TimeClaim::Valid(exp) if now >= exp => println!(
             "Token expired at {} ({} seconds ago)",
             format_timestamp(exp),
-            now - exp
+            now_wide - i128::from(exp)
         ),
         TimeClaim::Valid(exp) => println!(
             "Token expires at {} ({} seconds from now)",
             format_timestamp(exp),
-            exp - now
+            i128::from(exp) - now_wide
         ),
         TimeClaim::Absent => println!("No expiration claim found"),
         TimeClaim::Invalid => {
@@ -35,12 +36,12 @@ pub fn check_expiration(claims: &Map<String, Value>) {
         TimeClaim::Valid(nbf) if now < nbf => println!(
             "Token not valid yet. Valid from {} (in {} seconds)",
             format_timestamp(nbf),
-            nbf - now
+            i128::from(nbf) - now_wide
         ),
         TimeClaim::Valid(nbf) => println!(
             "Token valid since {} ({} seconds ago)",
             format_timestamp(nbf),
-            now - nbf
+            now_wide - i128::from(nbf)
         ),
         TimeClaim::Invalid => {
             if let Some(value) = claims.get("nbf") {
@@ -54,7 +55,7 @@ pub fn check_expiration(claims: &Map<String, Value>) {
         TimeClaim::Valid(iat) => println!(
             "Issued at: {} ({} seconds ago)",
             format_timestamp(iat),
-            now - iat
+            now_wide - i128::from(iat)
         ),
         TimeClaim::Invalid => {
             if let Some(value) = claims.get("iat") {
