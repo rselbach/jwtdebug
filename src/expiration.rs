@@ -4,8 +4,7 @@ use serde_json::{Map, Value};
 use time::format_description::well_known::Rfc3339;
 use time::{OffsetDateTime, UtcOffset};
 
-const MIN_TIMESTAMP: i64 = 946_684_800;
-const MAX_TIMESTAMP: i64 = 4_102_444_800;
+use crate::time_claims::{classify_time_claim, TimeClaim};
 
 pub fn check_expiration(claims: &Map<String, Value>) {
     let now = SystemTime::now()
@@ -13,73 +12,59 @@ pub fn check_expiration(claims: &Map<String, Value>) {
         .map_or(0, |duration| duration.as_secs() as i64);
 
     println!("EXPIRATION:");
-    match time_claim(claims, "exp") {
-        Some(exp) if now >= exp => println!(
+    match classify_time_claim(claims, "exp") {
+        TimeClaim::Valid(exp) if now >= exp => println!(
             "Token expired at {} ({} seconds ago)",
             format_timestamp(exp),
             now - exp
         ),
-        Some(exp) => println!(
+        TimeClaim::Valid(exp) => println!(
             "Token expires at {} ({} seconds from now)",
             format_timestamp(exp),
             exp - now
         ),
-        None if !claims.contains_key("exp") => println!("No expiration claim found"),
-        None => {}
+        TimeClaim::Absent => println!("No expiration claim found"),
+        TimeClaim::Invalid => {
+            if let Some(value) = claims.get("exp") {
+                println!("Unrecognized exp value: {value}");
+            }
+        }
     }
 
-    match time_claim(claims, "nbf") {
-        Some(nbf) if now < nbf => println!(
+    match classify_time_claim(claims, "nbf") {
+        TimeClaim::Valid(nbf) if now < nbf => println!(
             "Token not valid yet. Valid from {} (in {} seconds)",
             format_timestamp(nbf),
             nbf - now
         ),
-        Some(nbf) => println!(
+        TimeClaim::Valid(nbf) => println!(
             "Token valid since {} ({} seconds ago)",
             format_timestamp(nbf),
             now - nbf
         ),
-        None => {}
+        TimeClaim::Invalid => {
+            if let Some(value) = claims.get("nbf") {
+                println!("Unrecognized nbf value: {value}");
+            }
+        }
+        TimeClaim::Absent => {}
     }
 
-    if let Some(iat) = time_claim(claims, "iat") {
-        println!(
+    match classify_time_claim(claims, "iat") {
+        TimeClaim::Valid(iat) => println!(
             "Issued at: {} ({} seconds ago)",
             format_timestamp(iat),
             now - iat
-        );
+        ),
+        TimeClaim::Invalid => {
+            if let Some(value) = claims.get("iat") {
+                println!("Unrecognized iat value: {value}");
+            }
+        }
+        TimeClaim::Absent => {}
     }
 
     println!();
-}
-
-fn time_claim(claims: &Map<String, Value>, name: &str) -> Option<i64> {
-    let value = claims.get(name)?;
-    let timestamp = try_parse_timestamp(value);
-    if timestamp.is_none() {
-        println!("Unrecognized {name} value: {value}");
-    }
-    timestamp
-}
-
-fn try_parse_timestamp(value: &Value) -> Option<i64> {
-    let timestamp = match value {
-        Value::Number(number) => number.as_i64()?,
-        Value::String(s) => parse_rfc3339_timestamp(s).or_else(|| s.parse::<i64>().ok())?,
-        _ => return None,
-    };
-
-    if !(MIN_TIMESTAMP..=MAX_TIMESTAMP).contains(&timestamp) {
-        return None;
-    }
-
-    Some(timestamp)
-}
-
-fn parse_rfc3339_timestamp(s: &str) -> Option<i64> {
-    OffsetDateTime::parse(s, &Rfc3339)
-        .ok()
-        .map(|datetime| datetime.unix_timestamp())
 }
 
 fn format_timestamp(timestamp: i64) -> String {
@@ -98,26 +83,13 @@ fn format_timestamp(timestamp: i64) -> String {
 mod tests {
     use serde_json::json;
 
-    use super::*;
+    use crate::time_claims::parse_numeric_date;
 
     #[test]
-    fn parses_numeric_string_epoch() {
+    fn parses_float_numeric_dates_for_display() {
         assert_eq!(
             Some(1_700_000_000),
-            try_parse_timestamp(&json!("1700000000"))
+            parse_numeric_date(&json!(1_700_000_000.0))
         );
-    }
-
-    #[test]
-    fn parses_rfc3339_utc() {
-        assert_eq!(
-            Some(1_136_214_245),
-            try_parse_timestamp(&json!("2006-01-02T15:04:05Z"))
-        );
-    }
-
-    #[test]
-    fn rejects_out_of_range_timestamp() {
-        assert_eq!(None, try_parse_timestamp(&json!(100)));
     }
 }

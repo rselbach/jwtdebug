@@ -179,6 +179,19 @@ fn quiet_suppresses_unverified_notice() {
 }
 
 #[test]
+fn expiration_report_accepts_float_numeric_dates() {
+    let token = unsigned_token(json!({ "sub": "Float Exp", "exp": 1_000_000_000.0 }));
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args(["--expiration", "--claims=false", "--quiet", &token])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Token expired at"))
+        .stdout(predicate::str::contains("seconds ago"));
+}
+
+#[test]
 fn multiple_token_arguments_are_processed_in_order() {
     let first = unsigned_token(json!({ "sub": "First Token" }));
     let second = unsigned_token(json!({ "sub": "Second Token" }));

@@ -3,6 +3,7 @@ mod constants;
 mod expiration;
 mod parser;
 mod printer;
+mod time_claims;
 mod verification;
 
 use std::io::{self, BufRead, IsTerminal};
