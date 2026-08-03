@@ -654,7 +654,7 @@ fn missing_key_file_exits_3() {
         ])
         .assert()
         .code(3)
-        .stderr(predicate::str::contains("failed to stat key file"));
+        .stderr(predicate::str::contains("failed to open key file"));
 }
 
 #[test]
@@ -707,7 +707,7 @@ fn unreadable_key_file_exits_3() {
         ])
         .assert()
         .code(3)
-        .stderr(predicate::str::contains("failed to read key file"));
+        .stderr(predicate::str::contains("failed to open key file"));
 
     fs::set_permissions(key_file.path(), fs::Permissions::from_mode(0o600))
         .expect("restore key file permissions");

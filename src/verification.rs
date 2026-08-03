@@ -1,4 +1,5 @@
-use std::fs;
+use std::fs::File;
+use std::io::Read;
 use std::str::FromStr;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -31,8 +32,8 @@ pub enum VerificationError {
     #[error("key file not provided (--key-file / -k required)")]
     MissingKeyFile,
 
-    #[error("failed to stat key file: {0}")]
-    StatKeyFile(#[source] std::io::Error),
+    #[error("failed to open key file: {0}")]
+    OpenKeyFile(#[source] std::io::Error),
 
     #[error("key file must be a regular file")]
     KeyFileNotRegular,
@@ -91,15 +92,7 @@ pub fn verify_token_signature(
         .filter(|key_file| !key_file.is_empty())
         .ok_or(VerificationError::MissingKeyFile)?;
 
-    let metadata = fs::metadata(key_file).map_err(VerificationError::StatKeyFile)?;
-    if !metadata.is_file() {
-        return Err(VerificationError::KeyFileNotRegular);
-    }
-    if metadata.len() > MAX_FILE_SIZE_BYTES {
-        return Err(VerificationError::KeyFileTooLarge);
-    }
-
-    let key_data = fs::read(key_file).map_err(VerificationError::ReadKeyFile)?;
+    let key_data = read_key_file(key_file)?;
     let algorithm_name = parsed
         .header
         .get("alg")
@@ -129,6 +122,29 @@ pub fn verify_token_signature(
         validate_time_claims(&parsed.claims)?;
     }
     Ok(())
+}
+
+/// Read a key file through a single handle, so the size limit governs the
+/// bytes actually used rather than a stat that could go stale before the read.
+fn read_key_file(path: &str) -> Result<Vec<u8>, VerificationError> {
+    let file = File::open(path).map_err(VerificationError::OpenKeyFile)?;
+    if !file
+        .metadata()
+        .map_err(VerificationError::OpenKeyFile)?
+        .is_file()
+    {
+        return Err(VerificationError::KeyFileNotRegular);
+    }
+
+    let mut key_data = Vec::new();
+    file.take(MAX_FILE_SIZE_BYTES + 1)
+        .read_to_end(&mut key_data)
+        .map_err(VerificationError::ReadKeyFile)?;
+    if key_data.len() as u64 > MAX_FILE_SIZE_BYTES {
+        return Err(VerificationError::KeyFileTooLarge);
+    }
+
+    Ok(key_data)
 }
 
 /// Translate a rejected signature into our own wording, so every algorithm
