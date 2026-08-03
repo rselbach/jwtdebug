@@ -67,9 +67,9 @@ pub fn classify_time_claim<'a>(
 
 /// Parse a JWT NumericDate-like value.
 ///
-/// Accepts JSON numbers (including fractional values), decimal integer strings,
-/// and RFC3339 timestamps. Rejects non-finite numbers, floats outside the
-/// supported signed-to-unsigned timestamp range, and other JSON types.
+/// Accepts JSON numbers and numeric strings (both including fractional
+/// values), and RFC3339 timestamps. Rejects non-finite numbers, floats outside
+/// the supported signed-to-unsigned timestamp range, and other JSON types.
 pub fn parse_numeric_date(value: &Value) -> Option<NumericDate> {
     match value {
         Value::Number(number) => {
@@ -79,21 +79,30 @@ pub fn parse_numeric_date(value: &Value) -> Option<NumericDate> {
             if let Some(timestamp) = number.as_u64() {
                 return Some(NumericDate::Integer(i128::from(timestamp)));
             }
-            let timestamp = number.as_f64()?;
-            if !timestamp.is_finite() {
-                return None;
-            }
-            if timestamp < i64::MIN as f64 || timestamp >= u64::MAX as f64 {
-                return None;
-            }
-            Some(NumericDate::Fractional(timestamp))
+            fractional_numeric_date(number.as_f64()?)
         }
-        Value::String(s) => parse_rfc3339_timestamp(s)
-            .or_else(|| s.parse::<i64>().ok())
-            .map(i128::from)
-            .map(NumericDate::Integer),
+        Value::String(s) => {
+            if let Some(timestamp) = parse_rfc3339_timestamp(s) {
+                return Some(NumericDate::Integer(i128::from(timestamp)));
+            }
+            if let Ok(timestamp) = s.parse::<i64>() {
+                return Some(NumericDate::Integer(i128::from(timestamp)));
+            }
+            fractional_numeric_date(s.parse::<f64>().ok()?)
+        }
         _ => None,
     }
+}
+
+fn fractional_numeric_date(timestamp: f64) -> Option<NumericDate> {
+    if !timestamp.is_finite() {
+        return None;
+    }
+    if timestamp < i64::MIN as f64 || timestamp >= u64::MAX as f64 {
+        return None;
+    }
+
+    Some(NumericDate::Fractional(timestamp))
 }
 
 fn parse_rfc3339_timestamp(s: &str) -> Option<i64> {
@@ -162,6 +171,23 @@ mod tests {
             Some(NumericDate::Integer(1_700_000_000)),
             parse_numeric_date(&json!("1700000000"))
         );
+    }
+
+    #[test]
+    fn parses_fractional_numeric_string() {
+        assert_eq!(
+            Some(NumericDate::Fractional(1_700_000_000.5)),
+            parse_numeric_date(&json!("1700000000.5"))
+        );
+    }
+
+    #[test]
+    fn rejects_unusable_numeric_strings() {
+        assert_eq!(None, parse_numeric_date(&json!("inf")));
+        assert_eq!(None, parse_numeric_date(&json!("NaN")));
+        assert_eq!(None, parse_numeric_date(&json!("1e400")));
+        assert_eq!(None, parse_numeric_date(&json!("not-a-date")));
+        assert_eq!(None, parse_numeric_date(&json!("")));
     }
 
     #[test]

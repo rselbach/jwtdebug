@@ -921,6 +921,28 @@ fn string_exp_is_enforced_during_verify() {
 }
 
 #[test]
+fn fractional_string_exp_is_enforced_during_verify() {
+    let secret = b"test-secret-key-at-least-32-bytes-long!";
+    let token = hmac_token(
+        secret,
+        json!({ "sub": "Fractional String Exp", "exp": "1000000000.5" }),
+    );
+    let key_file = key_file(secret);
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args([
+            "--verify",
+            "--key-file",
+            key_file.path().to_str().expect("utf-8 path"),
+            &token,
+        ])
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains("token is expired"));
+}
+
+#[test]
 fn string_nbf_is_enforced_during_verify() {
     let secret = b"test-secret-key-at-least-32-bytes-long!";
     let token = hmac_token(secret, json!({ "sub": "String Nbf", "nbf": "2000000000" }));
