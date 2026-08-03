@@ -36,6 +36,12 @@ pub fn print_verification_failure(err: &dyn std::error::Error) {
     eprintln!("Signature verification failed: {err}");
 }
 
+pub fn print_weak_hmac_key_warning(actual: usize, minimum: usize) {
+    eprintln!(
+        "Warning: HMAC key is {actual} bytes; RFC 7518 requires at least {minimum} for this algorithm"
+    );
+}
+
 pub fn print_unverified_notice(quiet: bool) {
     if quiet {
         return;

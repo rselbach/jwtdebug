@@ -730,10 +730,10 @@ fn asymmetric_public_keys_cannot_be_used_as_hmac_secrets() {
 }
 
 #[test]
-fn short_hmac_key_exits_3() {
-    let secret = b"test-secret-key-at-least-32-bytes-long!";
+fn short_hmac_key_warns_but_still_verifies() {
+    let secret = b"too-short";
     let token = hmac_token(secret, json!({ "sub": "Short HMAC Key" }));
-    let key_file = key_file(b"too-short");
+    let key_file = key_file(secret);
 
     Command::cargo_bin("jwtdebug")
         .expect("binary exists")
@@ -744,8 +744,34 @@ fn short_hmac_key_exits_3() {
             &token,
         ])
         .assert()
-        .code(3)
-        .stderr(predicate::str::contains("HMAC key too short"));
+        .success()
+        .stderr(predicate::str::contains("Warning: HMAC key is 9 bytes"))
+        .stdout(predicate::str::contains("Signature verified successfully"));
+}
+
+#[test]
+fn jwt_io_sample_token_verifies_with_its_own_secret() {
+    // jwt.io's default HS256 example. Its 19-byte secret is the single most
+    // common thing anyone pastes at a JWT tool, and a hard minimum key length
+    // refused it outright.
+    let token = concat!(
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.",
+        "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.",
+        "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+    );
+    let key_file = key_file(b"your-256-bit-secret");
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args([
+            "--verify",
+            "--key-file",
+            key_file.path().to_str().expect("utf-8 path"),
+            token,
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Signature verified successfully"));
 }
 
 #[test]

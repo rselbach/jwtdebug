@@ -14,6 +14,7 @@ use thiserror::Error;
 
 use crate::constants::MAX_FILE_SIZE_BYTES;
 use crate::parser::ParsedToken;
+use crate::printer;
 use crate::time_claims::{classify_time_claim, TimeClaim};
 
 // Clock-skew tolerance for exp/nbf, matching jsonwebtoken's historical default
@@ -43,9 +44,6 @@ pub enum VerificationError {
 
     #[error("HMAC key file contains an asymmetric key")]
     HmacKeyIsAsymmetric,
-
-    #[error("HMAC key too short: {actual} bytes (minimum {minimum} bytes)")]
-    HmacKeyTooShort { actual: usize, minimum: usize },
 
     #[error("unexpected signing method: {0}")]
     UnexpectedAlgorithm(String),
@@ -173,11 +171,11 @@ fn decoding_key(algorithm: Algorithm, key_data: &[u8]) -> Result<DecodingKey, Ve
                 Algorithm::HS384 => MIN_HMAC_KEY_LEN_HS384,
                 _ => MIN_HMAC_KEY_LEN_HS512,
             };
+            // RFC 7518 wants a key at least as long as the hash output, but
+            // inspecting a token signed with a short secret is a legitimate
+            // use of a debugging tool, so say something and carry on.
             if key_data.len() < min_len {
-                return Err(VerificationError::HmacKeyTooShort {
-                    actual: key_data.len(),
-                    minimum: min_len,
-                });
+                printer::print_weak_hmac_key_warning(key_data.len(), min_len);
             }
             Ok(DecodingKey::from_secret(key_data))
         }
