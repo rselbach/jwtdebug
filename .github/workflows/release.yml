@@ -29,14 +29,6 @@ jobs:
       - name: Install cargo-zigbuild
         run: cargo install --locked cargo-zigbuild
 
-      - name: Install appimagetool
-        run: |
-          sudo apt-get update && sudo apt-get install -y libfuse2
-          curl -L -o /tmp/appimagetool \
-            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x /tmp/appimagetool
-          sudo mv /tmp/appimagetool /usr/local/bin/appimagetool
-
       - id: release_notes
         uses: rselbach/actions/pi-release-notes@v1
         env:

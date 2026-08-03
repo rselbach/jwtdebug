@@ -238,8 +238,7 @@ jwtdebug/
 │   ├── parser.rs        # JWT parsing and smart extraction
 │   ├── printer.rs       # Output formatting
 │   └── verification.rs  # Signature verification
-├── tests/               # CLI integration tests
-└── scripts/             # Build scripts (AppImage)
+└── tests/               # CLI integration tests
 ```
 
 ## Contributing
