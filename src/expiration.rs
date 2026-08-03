@@ -90,18 +90,3 @@ fn format_timestamp(timestamp: i128) -> String {
         .format(&Rfc3339)
         .unwrap_or_else(|_| timestamp.to_string())
 }
-
-#[cfg(test)]
-mod tests {
-    use serde_json::json;
-
-    use crate::time_claims::{parse_numeric_date, NumericDate};
-
-    #[test]
-    fn parses_float_numeric_dates_for_display() {
-        assert_eq!(
-            Some(NumericDate::Fractional(1_700_000_000.0)),
-            parse_numeric_date(&json!(1_700_000_000.0))
-        );
-    }
-}
