@@ -1,6 +1,6 @@
 use std::fs;
 use std::str::FromStr;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
@@ -17,7 +17,7 @@ use crate::time_claims::{classify_time_claim, TimeClaim};
 
 // Clock-skew tolerance for exp/nbf, matching jsonwebtoken's historical default
 // so every algorithm shares the same temporal policy.
-const LEEWAY_SECONDS: i64 = 60;
+const LEEWAY: Duration = Duration::from_secs(60);
 
 const MIN_HMAC_KEY_LEN_HS256: usize = 32;
 const MIN_HMAC_KEY_LEN_HS384: usize = 48;
@@ -196,12 +196,15 @@ fn verify_es512(
 fn validate_time_claims(claims: &Map<String, Value>) -> Result<(), VerificationError> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_or(0, |duration| duration.as_secs() as i64);
+        .unwrap_or_default();
 
     validate_time_claims_at(claims, now)
 }
 
-fn validate_time_claims_at(claims: &Map<String, Value>, now: i64) -> Result<(), VerificationError> {
+fn validate_time_claims_at(
+    claims: &Map<String, Value>,
+    now: Duration,
+) -> Result<(), VerificationError> {
     match classify_time_claim(claims, "exp") {
         TimeClaim::Absent => {}
         TimeClaim::Invalid(value) => {
@@ -210,7 +213,7 @@ fn validate_time_claims_at(claims: &Map<String, Value>, now: i64) -> Result<(), 
                 value: value.to_string(),
             });
         }
-        TimeClaim::Valid(exp) if exp.is_before(now.saturating_sub(LEEWAY_SECONDS)) => {
+        TimeClaim::Valid(exp) if exp.is_before_unix_time(now.saturating_sub(LEEWAY)) => {
             return Err(VerificationError::TokenExpired);
         }
         TimeClaim::Valid(_) => {}
@@ -224,7 +227,7 @@ fn validate_time_claims_at(claims: &Map<String, Value>, now: i64) -> Result<(), 
                 value: value.to_string(),
             });
         }
-        TimeClaim::Valid(nbf) if nbf.is_after(now.saturating_add(LEEWAY_SECONDS)) => {
+        TimeClaim::Valid(nbf) if nbf.is_after_unix_time(now.saturating_add(LEEWAY)) => {
             return Err(VerificationError::TokenNotValidYet);
         }
         TimeClaim::Valid(_) => {}
@@ -280,7 +283,7 @@ mod tests {
 
     #[test]
     fn enforces_fractional_numeric_dates_at_leeway_boundary() {
-        let now = 1_700_000_000;
+        let now = Duration::from_secs(1_700_000_000);
         let expired = json!({ "exp": 1_699_999_939.6 });
         let err = validate_time_claims_at(expired.as_object().expect("claims object"), now)
             .expect_err("fractional exp is below the leeway boundary");
@@ -345,14 +348,14 @@ mod tests {
         let future_exp = json!({ "exp": u64::MAX });
         assert!(validate_time_claims_at(
             future_exp.as_object().expect("claims object"),
-            1_700_000_000,
+            Duration::from_secs(1_700_000_000),
         )
         .is_ok());
 
         let future_nbf = json!({ "nbf": u64::MAX });
         let err = validate_time_claims_at(
             future_nbf.as_object().expect("claims object"),
-            1_700_000_000,
+            Duration::from_secs(1_700_000_000),
         )
         .expect_err("maximum unsigned nbf is in the future");
         assert!(matches!(err, VerificationError::TokenNotValidYet));

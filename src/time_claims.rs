@@ -14,19 +14,11 @@ pub enum NumericDate {
 }
 
 impl NumericDate {
-    /// Return whether this date is before an integer Unix timestamp.
-    pub fn is_before(self, timestamp: i64) -> bool {
+    /// Return whether this date is before a duration since the Unix epoch.
+    pub fn is_before_unix_time(self, timestamp: Duration) -> bool {
         match self {
-            Self::Integer(value) => value < i128::from(timestamp),
-            Self::Fractional(value) => value < timestamp as f64,
-        }
-    }
-
-    /// Return whether this date is after an integer Unix timestamp.
-    pub fn is_after(self, timestamp: i64) -> bool {
-        match self {
-            Self::Integer(value) => value > i128::from(timestamp),
-            Self::Fractional(value) => value > timestamp as f64,
+            Self::Integer(value) => value < i128::from(timestamp.as_secs()),
+            Self::Fractional(value) => value < timestamp.as_secs_f64(),
         }
     }
 
