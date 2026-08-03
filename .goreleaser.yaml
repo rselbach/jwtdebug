@@ -36,8 +36,10 @@ builds:
       - aarch64-apple-darwin
       - x86_64-pc-windows-gnu
 
-brews:
-  - homepage: https://github.com/rselbach/jwtdebug
+homebrew_casks:
+  - binaries:
+      - jwtdebug
+    homepage: https://github.com/rselbach/jwtdebug
     license: MIT
     description: >-
       A command line tool to decode and debug JWTs (JSON Web Tokens).
@@ -46,9 +48,6 @@ brews:
       name: homebrew-tap
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    download_strategy: CurlDownloadStrategy
-    test: |
-      system "#{bin}/jwtdebug --version"
 
 archives:
   - id: default
