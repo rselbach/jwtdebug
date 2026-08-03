@@ -1,4 +1,4 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde_json::{Map, Value};
 use time::format_description::well_known::Rfc3339;
@@ -10,55 +10,60 @@ pub fn check_expiration(claims: &Map<String, Value>) {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default();
-    let now_wide = i128::from(now.as_secs());
 
     println!("EXPIRATION:");
-    match classify_time_claim(claims, "exp") {
-        TimeClaim::Valid(exp) if !exp.is_after_unix_time(now) => println!(
-            "Token expired at {} ({} seconds ago)",
-            format_timestamp(exp.rounded_seconds()),
-            (now_wide - exp.rounded_seconds()).max(0)
-        ),
-        TimeClaim::Valid(exp) => println!(
-            "Token expires at {} ({} seconds from now)",
-            format_timestamp(exp.rounded_seconds()),
-            (exp.rounded_seconds() - now_wide).max(0)
-        ),
-        TimeClaim::Absent => println!("No expiration claim found"),
-        TimeClaim::Invalid(value) => println!("Unrecognized exp value: {value}"),
+    match resolve(claims, "exp", now) {
+        Resolved::Past(at, ago) => println!("Token expired at {at} ({ago} seconds ago)"),
+        Resolved::Future(at, until) => {
+            println!("Token expires at {at} ({until} seconds from now)")
+        }
+        Resolved::Absent => println!("No expiration claim found"),
+        Resolved::Unrecognized(value) => println!("Unrecognized exp value: {value}"),
     }
 
-    match classify_time_claim(claims, "nbf") {
-        TimeClaim::Valid(nbf) if nbf.is_after_unix_time(now) => println!(
-            "Token not valid yet. Valid from {} (in {} seconds)",
-            format_timestamp(nbf.rounded_seconds()),
-            (nbf.rounded_seconds() - now_wide).max(0)
-        ),
-        TimeClaim::Valid(nbf) => println!(
-            "Token valid since {} ({} seconds ago)",
-            format_timestamp(nbf.rounded_seconds()),
-            (now_wide - nbf.rounded_seconds()).max(0)
-        ),
-        TimeClaim::Invalid(value) => println!("Unrecognized nbf value: {value}"),
-        TimeClaim::Absent => {}
+    match resolve(claims, "nbf", now) {
+        Resolved::Past(at, ago) => println!("Token valid since {at} ({ago} seconds ago)"),
+        Resolved::Future(at, until) => {
+            println!("Token not valid yet. Valid from {at} (in {until} seconds)")
+        }
+        Resolved::Absent => {}
+        Resolved::Unrecognized(value) => println!("Unrecognized nbf value: {value}"),
     }
 
-    match classify_time_claim(claims, "iat") {
-        TimeClaim::Valid(iat) if iat.is_after_unix_time(now) => println!(
-            "Issued at: {} ({} seconds from now)",
-            format_timestamp(iat.rounded_seconds()),
-            (iat.rounded_seconds() - now_wide).max(0)
-        ),
-        TimeClaim::Valid(iat) => println!(
-            "Issued at: {} ({} seconds ago)",
-            format_timestamp(iat.rounded_seconds()),
-            (now_wide - iat.rounded_seconds()).max(0)
-        ),
-        TimeClaim::Invalid(value) => println!("Unrecognized iat value: {value}"),
-        TimeClaim::Absent => {}
+    match resolve(claims, "iat", now) {
+        Resolved::Past(at, ago) => println!("Issued at: {at} ({ago} seconds ago)"),
+        Resolved::Future(at, until) => println!("Issued at: {at} ({until} seconds from now)"),
+        Resolved::Absent => {}
+        Resolved::Unrecognized(value) => println!("Unrecognized iat value: {value}"),
     }
 
     println!();
+}
+
+/// A time claim reduced to what the report needs: a formatted local timestamp
+/// and its non-negative distance from now, in seconds.
+enum Resolved<'a> {
+    Past(String, i128),
+    Future(String, i128),
+    Absent,
+    Unrecognized(&'a Value),
+}
+
+fn resolve<'a>(claims: &'a Map<String, Value>, name: &str, now: Duration) -> Resolved<'a> {
+    let now_wide = i128::from(now.as_secs());
+    match classify_time_claim(claims, name) {
+        TimeClaim::Absent => Resolved::Absent,
+        TimeClaim::Invalid(value) => Resolved::Unrecognized(value),
+        TimeClaim::Valid(claim) => {
+            let seconds = claim.rounded_seconds();
+            let at = format_timestamp(seconds);
+            if claim.is_after_unix_time(now) {
+                Resolved::Future(at, (seconds - now_wide).max(0))
+            } else {
+                Resolved::Past(at, (now_wide - seconds).max(0))
+            }
+        }
+    }
 }
 
 fn format_timestamp(timestamp: i128) -> String {
