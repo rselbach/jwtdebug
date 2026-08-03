@@ -136,9 +136,7 @@ pub fn verify_token_signature(
 
     decode::<Value>(&parsed.raw, &key, &validation)
         .map_err(|err| hmac_newline_hint(map_jwt_error(err), algorithm, &key_data))?;
-    if !ignore_expiration {
-        validate_time_claims(&parsed.claims)?;
-    }
+    validate_time_claims(&parsed.claims, ignore_expiration)?;
     Ok(())
 }
 
@@ -259,37 +257,41 @@ fn verify_es512(
         .verify(signing_input.as_bytes(), &signature)
         .map_err(|_| VerificationError::SignatureInvalid)?;
 
-    if !ignore_expiration {
-        validate_time_claims(&parsed.claims)?;
-    }
+    validate_time_claims(&parsed.claims, ignore_expiration)?;
 
     Ok(())
 }
 
-fn validate_time_claims(claims: &Map<String, Value>) -> Result<(), VerificationError> {
+fn validate_time_claims(
+    claims: &Map<String, Value>,
+    ignore_expiration: bool,
+) -> Result<(), VerificationError> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default();
 
-    validate_time_claims_at(claims, now)
+    validate_time_claims_at(claims, now, ignore_expiration)
 }
 
 fn validate_time_claims_at(
     claims: &Map<String, Value>,
     now: Duration,
+    ignore_expiration: bool,
 ) -> Result<(), VerificationError> {
-    match classify_time_claim(claims, "exp") {
-        TimeClaim::Absent => {}
-        TimeClaim::Invalid(value) => {
-            return Err(VerificationError::InvalidTimeClaim {
-                claim: "exp",
-                value: value.to_string(),
-            });
+    if !ignore_expiration {
+        match classify_time_claim(claims, "exp") {
+            TimeClaim::Absent => {}
+            TimeClaim::Invalid(value) => {
+                return Err(VerificationError::InvalidTimeClaim {
+                    claim: "exp",
+                    value: value.to_string(),
+                });
+            }
+            TimeClaim::Valid(exp) if exp.is_before_unix_time(now.saturating_sub(LEEWAY)) => {
+                return Err(VerificationError::TokenExpired);
+            }
+            TimeClaim::Valid(_) => {}
         }
-        TimeClaim::Valid(exp) if exp.is_before_unix_time(now.saturating_sub(LEEWAY)) => {
-            return Err(VerificationError::TokenExpired);
-        }
-        TimeClaim::Valid(_) => {}
     }
 
     match classify_time_claim(claims, "nbf") {
@@ -334,7 +336,7 @@ mod tests {
             .as_secs();
         let claims = json!({ "exp": now as f64 - 3600.5 });
 
-        let err = validate_time_claims(claims.as_object().expect("claims object"))
+        let err = validate_time_claims(claims.as_object().expect("claims object"), false)
             .expect_err("expired token");
 
         assert!(matches!(err, VerificationError::TokenExpired));
@@ -348,7 +350,7 @@ mod tests {
             .as_secs();
         let claims = json!({ "nbf": now as f64 + 3600.5 });
 
-        let err = validate_time_claims(claims.as_object().expect("claims object"))
+        let err = validate_time_claims(claims.as_object().expect("claims object"), false)
             .expect_err("token not valid yet");
 
         assert!(matches!(err, VerificationError::TokenNotValidYet));
@@ -358,12 +360,12 @@ mod tests {
     fn enforces_fractional_numeric_dates_at_leeway_boundary() {
         let now = Duration::from_secs(1_700_000_000);
         let expired = json!({ "exp": 1_699_999_939.6 });
-        let err = validate_time_claims_at(expired.as_object().expect("claims object"), now)
+        let err = validate_time_claims_at(expired.as_object().expect("claims object"), now, false)
             .expect_err("fractional exp is below the leeway boundary");
         assert!(matches!(err, VerificationError::TokenExpired));
 
         let immature = json!({ "nbf": 1_700_000_060.4 });
-        let err = validate_time_claims_at(immature.as_object().expect("claims object"), now)
+        let err = validate_time_claims_at(immature.as_object().expect("claims object"), now, false)
             .expect_err("fractional nbf is above the leeway boundary");
         assert!(matches!(err, VerificationError::TokenNotValidYet));
     }
@@ -371,7 +373,7 @@ mod tests {
     #[test]
     fn rejects_expired_string_numeric_date() {
         let claims = json!({ "exp": "1000000000" });
-        let err = validate_time_claims(claims.as_object().expect("claims object"))
+        let err = validate_time_claims(claims.as_object().expect("claims object"), false)
             .expect_err("expired string exp");
         assert!(matches!(err, VerificationError::TokenExpired));
     }
@@ -379,7 +381,7 @@ mod tests {
     #[test]
     fn rejects_future_string_numeric_date() {
         let claims = json!({ "nbf": "2000000000" });
-        let err = validate_time_claims(claims.as_object().expect("claims object"))
+        let err = validate_time_claims(claims.as_object().expect("claims object"), false)
             .expect_err("future string nbf");
         assert!(matches!(err, VerificationError::TokenNotValidYet));
     }
@@ -393,7 +395,7 @@ mod tests {
             ("nbf", json!({})),
         ] {
             let claims = serde_json::Map::from_iter([(claim.to_string(), value)]);
-            let err = validate_time_claims(&claims).expect_err("malformed time claim");
+            let err = validate_time_claims(&claims, false).expect_err("malformed time claim");
             assert!(
                 matches!(err, VerificationError::InvalidTimeClaim { .. }),
                 "claim={claim} err={err:?}"
@@ -405,7 +407,7 @@ mod tests {
     fn rejects_negative_exp_as_expired() {
         // Negative epochs are valid NumericDates and are always in the past.
         let claims = json!({ "exp": -1 });
-        let err = validate_time_claims(claims.as_object().expect("claims object"))
+        let err = validate_time_claims(claims.as_object().expect("claims object"), false)
             .expect_err("negative exp is expired");
         assert!(matches!(err, VerificationError::TokenExpired));
     }
@@ -413,7 +415,7 @@ mod tests {
     #[test]
     fn accepts_far_future_exp_within_i64() {
         let claims = json!({ "exp": i64::MAX });
-        assert!(validate_time_claims(claims.as_object().expect("claims object")).is_ok());
+        assert!(validate_time_claims(claims.as_object().expect("claims object"), false).is_ok());
     }
 
     #[test]
@@ -422,6 +424,7 @@ mod tests {
         assert!(validate_time_claims_at(
             future_exp.as_object().expect("claims object"),
             Duration::from_secs(1_700_000_000),
+            false,
         )
         .is_ok());
 
@@ -429,9 +432,37 @@ mod tests {
         let err = validate_time_claims_at(
             future_nbf.as_object().expect("claims object"),
             Duration::from_secs(1_700_000_000),
+            false,
         )
         .expect_err("maximum unsigned nbf is in the future");
         assert!(matches!(err, VerificationError::TokenNotValidYet));
+    }
+
+    #[test]
+    fn ignoring_expiration_still_enforces_not_before() {
+        let claims = json!({
+            "exp": 1,
+            "nbf": 1_700_000_061,
+        });
+
+        let err = validate_time_claims_at(
+            claims.as_object().expect("claims object"),
+            Duration::from_secs(1_700_000_000),
+            true,
+        )
+        .expect_err("future nbf must still fail");
+
+        assert!(matches!(err, VerificationError::TokenNotValidYet));
+
+        let malformed = json!({ "exp": 1, "nbf": false });
+        let err = validate_time_claims_at(
+            malformed.as_object().expect("claims object"),
+            Duration::from_secs(1_700_000_000),
+            true,
+        )
+        .expect_err("malformed nbf must still fail");
+
+        assert!(matches!(err, VerificationError::InvalidTimeClaim { .. }));
     }
 
     #[test]
