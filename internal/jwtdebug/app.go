@@ -14,6 +14,7 @@ const (
 	exitError            = 1
 	exitInvalidToken     = 2
 	exitVerificationFail = 3
+	maxTokenInputSize    = 1024 * 1024
 )
 
 type verifierState struct {
@@ -76,6 +77,13 @@ func (p *tokenProcessor) processInputs(
 
 	exitCode := exitSuccess
 	for _, token := range tokens {
+		if token == "-" {
+			exitCode = retainFirstFailure(
+				exitCode,
+				p.processStdin(stdin, stdinIsTerminal, true),
+			)
+			continue
+		}
 		exitCode = retainFirstFailure(exitCode, p.processToken(token))
 	}
 	return exitCode
@@ -89,6 +97,10 @@ func retainFirstFailure(seen, current int) int {
 }
 
 func (p *tokenProcessor) processToken(input string) int {
+	if len(strings.TrimSpace(input)) > maxTokenInputSize {
+		p.out.stderrLine("Error: token input exceeds maximum size of %d bytes", maxTokenInputSize)
+		return exitInvalidToken
+	}
 	parsed, err := resolveToken(input, p.flags.strict)
 	if err != nil {
 		p.out.stderrLine("Error: %v", err)
@@ -234,9 +246,14 @@ func (p *tokenProcessor) processStdin(
 	hasToken := false
 	exitCode := exitSuccess
 	for {
-		line, err := reader.ReadString('\n')
+		line, tooLarge, err := readInputLine(reader)
+		if tooLarge {
+			hasToken = true
+			p.out.stderrLine("Error: token input exceeds maximum size of %d bytes", maxTokenInputSize)
+			exitCode = retainFirstFailure(exitCode, exitInvalidToken)
+		}
 		line = strings.TrimSpace(line)
-		if line != "" {
+		if !tooLarge && line != "" {
 			hasToken = true
 			exitCode = retainFirstFailure(exitCode, p.processToken(line))
 		}
@@ -252,8 +269,30 @@ func (p *tokenProcessor) processStdin(
 			return exitCode
 		default:
 			p.out.stderrLine("Error: failed to read stdin: %v", err)
-			return exitError
+			return retainFirstFailure(exitCode, exitError)
 		}
+	}
+}
+
+func readInputLine(reader *bufio.Reader) (string, bool, error) {
+	var line []byte
+	tooLarge := false
+	for {
+		fragment, err := reader.ReadSlice('\n')
+		if !tooLarge {
+			// Leave room for a line ending; processToken enforces the exact
+			// post-trimming token limit.
+			if len(line)+len(fragment) > maxTokenInputSize+2 {
+				tooLarge = true
+				line = nil
+			} else {
+				line = append(line, fragment...)
+			}
+		}
+		if errors.Is(err, bufio.ErrBufferFull) {
+			continue
+		}
+		return string(line), tooLarge, err
 	}
 }
 

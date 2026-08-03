@@ -323,6 +323,8 @@ Exit codes:
   2  Invalid token format
   3  Signature verification failed
 
+Token inputs are limited to 1 MiB per argument or stdin line.
+
 For more information, see: https://github.com/rselbach/jwtdebug
 `)
 }

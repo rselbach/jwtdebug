@@ -192,6 +192,73 @@ func TestCLIReadsExplicitStdin(t *testing.T) {
 	}
 }
 
+func TestCLIReadsExplicitStdinAmongArguments(t *testing.T) {
+	argument := unsignedJWT(t, map[string]any{"sub": "Argument Token"})
+	standardInput := unsignedJWT(t, map[string]any{"sub": "Stdin Token"})
+	result := runCLI(t, []string{"--quiet", argument, "-"}, standardInput+"\n")
+	if result.exitCode != exitSuccess {
+		t.Fatalf("result = %+v", result)
+	}
+	for _, want := range []string{"Argument Token", "Stdin Token"} {
+		if !strings.Contains(result.stdout, want) {
+			t.Errorf("stdout missing %q: %s", want, result.stdout)
+		}
+	}
+}
+
+func TestCLIRejectsOversizedInputsAndContinuesStdin(t *testing.T) {
+	atLimit := runCLI(t, []string{strings.Repeat("x", maxTokenInputSize)}, "")
+	if strings.Contains(atLimit.stderr, "exceeds maximum size") {
+		t.Fatalf("at-limit argument was rejected as oversized: %+v", atLimit)
+	}
+
+	oversized := strings.Repeat("x", maxTokenInputSize+1)
+	argument := runCLI(t, []string{oversized}, "")
+	if argument.exitCode != exitInvalidToken || !strings.Contains(argument.stderr, "exceeds maximum size") {
+		t.Fatalf("oversized argument result = %+v", argument)
+	}
+
+	valid := unsignedJWT(t, map[string]any{"sub": "After Oversized Input"})
+	standardInput := runCLI(t, []string{"--quiet"}, oversized+"\n"+valid+"\n")
+	if standardInput.exitCode != exitInvalidToken ||
+		!strings.Contains(standardInput.stderr, "exceeds maximum size") ||
+		!strings.Contains(standardInput.stdout, "After Oversized Input") {
+		t.Fatalf("oversized stdin result = %+v", standardInput)
+	}
+}
+
+type errorAfterDataReader struct {
+	data []byte
+	err  error
+}
+
+func (r *errorAfterDataReader) Read(buffer []byte) (int, error) {
+	if len(r.data) == 0 {
+		return 0, r.err
+	}
+	read := copy(buffer, r.data)
+	r.data = r.data[read:]
+	return read, nil
+}
+
+func TestCLIStdinRetainsTokenFailureBeforeReadError(t *testing.T) {
+	readErr := errors.New("read failed")
+	reader := &errorAfterDataReader{data: []byte("not-a-token\n"), err: readErr}
+	var stdout strings.Builder
+	var stderr strings.Builder
+	out := newOutput(&stdout, &stderr)
+
+	exitCode := run([]string{"--quiet"}, reader, false, out)
+	if exitCode != exitInvalidToken {
+		t.Fatalf("exit code = %d, want %d", exitCode, exitInvalidToken)
+	}
+	for _, want := range []string{"invalid token format", "failed to read stdin: read failed"} {
+		if !strings.Contains(stderr.String(), want) {
+			t.Errorf("stderr missing %q: %s", want, stderr.String())
+		}
+	}
+}
+
 func TestCLIEmptyStdinIsGeneralError(t *testing.T) {
 	result := runCLI(t, nil, "")
 	if result.exitCode != exitError || !strings.Contains(result.stderr, "no token provided on stdin") {
