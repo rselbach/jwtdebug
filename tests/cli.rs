@@ -287,6 +287,20 @@ fn expiration_report_handles_timezone_shifted_boundary_timestamps() {
 }
 
 #[test]
+fn expiration_report_states_future_iat_as_time_remaining() {
+    let token = unsigned_token(json!({ "sub": "Craig Pelton", "iat": 4_102_444_800_u64 }));
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args(["--expiration", "--claims=false", "--quiet", &token])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Issued at:"))
+        .stdout(predicate::str::contains("seconds from now"))
+        .stdout(predicate::str::contains("seconds ago").not());
+}
+
+#[test]
 fn expiration_report_uses_the_offset_in_effect_at_each_timestamp() {
     // One winter and one summer instant in a DST-observing zone: no single
     // fixed offset renders both correctly, whatever today's date happens to be.

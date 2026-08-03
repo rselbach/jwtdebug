@@ -52,10 +52,15 @@ pub fn check_expiration(claims: &Map<String, Value>) {
     }
 
     match classify_time_claim(claims, "iat") {
+        TimeClaim::Valid(iat) if iat.is_after_unix_time(now) => println!(
+            "Issued at: {} ({} seconds from now)",
+            format_timestamp(iat.rounded_seconds()),
+            (iat.rounded_seconds() - now_wide).max(0)
+        ),
         TimeClaim::Valid(iat) => println!(
             "Issued at: {} ({} seconds ago)",
             format_timestamp(iat.rounded_seconds()),
-            now_wide - iat.rounded_seconds()
+            (now_wide - iat.rounded_seconds()).max(0)
         ),
         TimeClaim::Invalid => {
             if let Some(value) = claims.get("iat") {
