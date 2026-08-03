@@ -371,6 +371,17 @@ mod tests {
     }
 
     #[test]
+    fn enforces_integer_exp_at_subsecond_leeway_boundary() {
+        let now = Duration::new(1_700_000_000, 500_000_000);
+        let expired = json!({ "exp": 1_699_999_940 });
+
+        let err = validate_time_claims_at(expired.as_object().expect("claims object"), now, false)
+            .expect_err("integer exp is before the subsecond boundary");
+
+        assert!(matches!(err, VerificationError::TokenExpired));
+    }
+
+    #[test]
     fn rejects_expired_string_numeric_date() {
         let claims = json!({ "exp": "1000000000" });
         let err = validate_time_claims(claims.as_object().expect("claims object"), false)

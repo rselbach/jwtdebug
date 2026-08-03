@@ -17,7 +17,11 @@ impl NumericDate {
     /// Return whether this date is before a duration since the Unix epoch.
     pub fn is_before_unix_time(self, timestamp: Duration) -> bool {
         match self {
-            Self::Integer(value) => value < i128::from(timestamp.as_secs()),
+            Self::Integer(value) => {
+                let timestamp_seconds = i128::from(timestamp.as_secs());
+                value < timestamp_seconds
+                    || (value == timestamp_seconds && timestamp.subsec_nanos() != 0)
+            }
             Self::Fractional(value) => value < timestamp.as_secs_f64(),
         }
     }
@@ -155,6 +159,15 @@ mod tests {
 
         assert!(!NumericDate::Fractional(1_700_000_000.5).is_after_unix_time(now));
         assert!(NumericDate::Fractional(1_700_000_000.9).is_after_unix_time(now));
+    }
+
+    #[test]
+    fn compares_integer_dates_with_subsecond_unix_time() {
+        let now = Duration::new(1_700_000_000, 500_000_000);
+
+        assert!(NumericDate::Integer(1_700_000_000).is_before_unix_time(now));
+        assert!(NumericDate::Fractional(1_700_000_000.0).is_before_unix_time(now));
+        assert!(!NumericDate::Integer(1_700_000_001).is_before_unix_time(now));
     }
 
     #[test]
