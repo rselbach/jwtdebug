@@ -50,8 +50,11 @@ where
     let (flags, positional_args, warnings) = match cli::parse(args) {
         Ok(parsed) => parsed,
         Err(err) => {
-            // clap's auto help/version are disabled (cli handles them as
-            // regular flags), so every parse failure here is a real error.
+            if err.kind() == clap::error::ErrorKind::DisplayHelp {
+                output.stdout_text(&err.to_string());
+                return EXIT_SUCCESS;
+            }
+
             output.stderr_text(&err.to_string());
             return EXIT_ERROR;
         }
@@ -59,11 +62,6 @@ where
 
     for warning in warnings {
         output.stderr_line(format_args!("{warning}"));
-    }
-
-    if flags.show_help {
-        cli::print_usage(output);
-        return EXIT_SUCCESS;
     }
 
     if flags.show_version {

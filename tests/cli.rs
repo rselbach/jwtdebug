@@ -458,17 +458,20 @@ fn empty_piped_stdin_is_general_error() {
 
 #[test]
 fn help_goes_to_stdout() {
-    Command::cargo_bin("jwtdebug")
-        .expect("binary exists")
-        .arg("--help")
-        .assert()
-        .success()
-        .stderr("")
-        .stdout(predicate::str::contains(
-            "Usage: jwtdebug [options] [token]",
-        ))
-        .stdout(predicate::str::contains("Display:"))
-        .stdout(predicate::str::contains("Exit Codes:"));
+    for flag in ["--help", "-help"] {
+        Command::cargo_bin("jwtdebug")
+            .expect("binary exists")
+            .arg(flag)
+            .assert()
+            .success()
+            .stderr("")
+            .stdout(predicate::str::contains(
+                "Usage: jwtdebug [OPTIONS] [token]...",
+            ))
+            .stdout(predicate::str::contains("Options:"))
+            .stdout(predicate::str::contains("--algorithm <algorithm>"))
+            .stdout(predicate::str::contains("Exit codes:"));
+    }
 }
 
 #[test]
