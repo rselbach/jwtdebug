@@ -262,6 +262,51 @@ fn expiration_report_handles_minimum_timestamp() {
 }
 
 #[test]
+fn expiration_report_handles_timezone_shifted_boundary_timestamps() {
+    // These timestamps are in range as UTC instants, but shifting them into a
+    // non-UTC local offset moves them past the supported year range.
+    for (timezone, timestamp) in [
+        ("Etc/GMT-14", 253_402_300_799_i64),
+        ("Etc/GMT+12", -377_705_116_800),
+    ] {
+        let token = unsigned_token(json!({
+            "sub": "Ben Chang",
+            "exp": timestamp,
+            "nbf": timestamp,
+            "iat": timestamp,
+        }));
+
+        Command::cargo_bin("jwtdebug")
+            .expect("binary exists")
+            .env("TZ", timezone)
+            .args(["--expiration", "--claims=false", "--quiet", &token])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Issued at:"));
+    }
+}
+
+#[test]
+fn expiration_report_uses_the_offset_in_effect_at_each_timestamp() {
+    // One winter and one summer instant in a DST-observing zone: no single
+    // fixed offset renders both correctly, whatever today's date happens to be.
+    for (timestamp, want) in [
+        (1_700_000_000_i64, "2023-11-14T17:13:20-05:00"),
+        (1_690_000_000, "2023-07-22T00:26:40-04:00"),
+    ] {
+        let token = unsigned_token(json!({ "sub": "Jeff Winger", "iat": timestamp }));
+
+        Command::cargo_bin("jwtdebug")
+            .expect("binary exists")
+            .env("TZ", "America/New_York")
+            .args(["--expiration", "--claims=false", "--quiet", &token])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains(want));
+    }
+}
+
+#[test]
 fn multiple_token_arguments_are_processed_in_order() {
     let first = unsigned_token(json!({ "sub": "First Token" }));
     let second = unsigned_token(json!({ "sub": "Second Token" }));
