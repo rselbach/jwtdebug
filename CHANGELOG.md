@@ -44,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   duplicate hand-maintained option list
 - Verification key files and algorithm-specific key parsers are prepared once
   per invocation and reused for every input token
+- Integration tests are split into focused CLI and verification targets with
+  shared fixtures in one support module
 - **BREAKING**: expiration report timestamps are always rendered in UTC for
   deterministic output across machines
 - **BREAKING**: signature verification now requires `--algorithm`, so the
