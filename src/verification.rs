@@ -16,7 +16,6 @@ use thiserror::Error;
 
 use crate::constants::MAX_FILE_SIZE_BYTES;
 use crate::parser::ParsedToken;
-use crate::printer;
 use crate::time_claims::{classify_time_claim, TimeClaim};
 
 // Clock-skew tolerance for exp/nbf, matching jsonwebtoken's historical default
@@ -89,12 +88,18 @@ pub enum VerificationError {
     Jwt(#[from] jsonwebtoken::errors::Error),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WeakHmacKeyWarning {
+    pub actual: usize,
+    pub minimum: usize,
+}
+
 pub fn verify_token_signature(
     parsed: &ParsedToken,
     key_file: Option<&str>,
     expected_algorithm: Option<&str>,
     ignore_expiration: bool,
-) -> Result<(), VerificationError> {
+) -> Result<Option<WeakHmacKeyWarning>, VerificationError> {
     let key_file = key_file
         .filter(|key_file| !key_file.is_empty())
         .ok_or(VerificationError::MissingKeyFile)?;
@@ -122,7 +127,7 @@ pub fn verify_token_signature(
 
     let algorithm = Algorithm::from_str(expected_algorithm)
         .map_err(|_| VerificationError::UnexpectedAlgorithm(expected_algorithm.to_string()))?;
-    let key = decoding_key(algorithm, &key_data)?;
+    let (key, warning) = decoding_key(algorithm, &key_data)?;
 
     let mut validation = Validation::new(algorithm);
     validation.required_spec_claims.clear();
@@ -137,7 +142,7 @@ pub fn verify_token_signature(
     decode::<Value>(&parsed.raw, &key, &validation)
         .map_err(|err| hmac_newline_hint(map_jwt_error(err), algorithm, &key_data))?;
     validate_time_claims(&parsed.claims, ignore_expiration)?;
-    Ok(())
+    Ok(warning)
 }
 
 /// Reject non-regular paths before opening, then bound the bytes read from the
@@ -201,7 +206,10 @@ fn hmac_newline_hint(
     error
 }
 
-fn decoding_key(algorithm: Algorithm, key_data: &[u8]) -> Result<DecodingKey, VerificationError> {
+fn decoding_key(
+    algorithm: Algorithm,
+    key_data: &[u8],
+) -> Result<(DecodingKey, Option<WeakHmacKeyWarning>), VerificationError> {
     match algorithm {
         Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => {
             if is_asymmetric_key(key_data) {
@@ -216,19 +224,20 @@ fn decoding_key(algorithm: Algorithm, key_data: &[u8]) -> Result<DecodingKey, Ve
             // RFC 7518 wants a key at least as long as the hash output, but
             // inspecting a token signed with a short secret is a legitimate
             // use of a debugging tool, so say something and carry on.
-            if key_data.len() < min_len {
-                printer::print_weak_hmac_key_warning(key_data.len(), min_len);
-            }
-            Ok(DecodingKey::from_secret(key_data))
+            let warning = (key_data.len() < min_len).then_some(WeakHmacKeyWarning {
+                actual: key_data.len(),
+                minimum: min_len,
+            });
+            Ok((DecodingKey::from_secret(key_data), warning))
         }
         Algorithm::RS256
         | Algorithm::RS384
         | Algorithm::RS512
         | Algorithm::PS256
         | Algorithm::PS384
-        | Algorithm::PS512 => Ok(DecodingKey::from_rsa_pem(key_data)?),
-        Algorithm::ES256 | Algorithm::ES384 => Ok(DecodingKey::from_ec_pem(key_data)?),
-        Algorithm::EdDSA => Ok(DecodingKey::from_ed_pem(key_data)?),
+        | Algorithm::PS512 => Ok((DecodingKey::from_rsa_pem(key_data)?, None)),
+        Algorithm::ES256 | Algorithm::ES384 => Ok((DecodingKey::from_ec_pem(key_data)?, None)),
+        Algorithm::EdDSA => Ok((DecodingKey::from_ed_pem(key_data)?, None)),
     }
 }
 
@@ -248,7 +257,7 @@ fn verify_es512(
     parsed: &ParsedToken,
     key_data: &[u8],
     ignore_expiration: bool,
-) -> Result<(), VerificationError> {
+) -> Result<Option<WeakHmacKeyWarning>, VerificationError> {
     let signature = URL_SAFE_NO_PAD
         .decode(&parsed.signature)
         .map_err(VerificationError::DecodeSignature)?;
@@ -268,7 +277,7 @@ fn verify_es512(
 
     validate_time_claims(&parsed.claims, ignore_expiration)?;
 
-    Ok(())
+    Ok(None)
 }
 
 fn validate_time_claims(
