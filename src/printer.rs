@@ -47,5 +47,5 @@ pub fn print_unverified_notice(quiet: bool) {
         return;
     }
 
-    eprintln!("Note: claims are unverified. Use --verify --key-file to validate.");
+    eprintln!("Note: claims are unverified. Use --verify --key-file --algorithm to validate.");
 }

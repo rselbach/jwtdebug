@@ -198,6 +198,8 @@ fn verbose_logs_parse_and_verify_diagnostics_to_stderr() {
         .args([
             "--verbose",
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &format!("Bearer {token}"),
@@ -386,6 +388,8 @@ fn the_first_failure_sets_the_exit_code() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             "not-a-valid-token",
@@ -476,6 +480,8 @@ fn deprecated_key_alias_warns_and_verifies() {
             "-key",
             key_file.path().to_str().expect("utf-8 path"),
             "--verify",
+            "--algorithm",
+            "HS256",
             &token,
         ])
         .assert()
@@ -515,6 +521,8 @@ fn deprecated_ignore_exp_alias_warns_and_ignores_expiration() {
         .args([
             "-ignore-exp",
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -602,6 +610,8 @@ fn hmac_verify_success_prints_success_message() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -622,6 +632,8 @@ fn wrong_hmac_secret_reports_an_invalid_signature() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -645,6 +657,8 @@ fn trailing_newline_in_hmac_key_file_is_named_in_the_error() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -669,6 +683,8 @@ fn pem_backed_algorithms_verify_successfully() {
             .expect("binary exists")
             .args([
                 "--verify",
+                "--algorithm",
+                subject,
                 "--key-file",
                 key_file.path().to_str().expect("utf-8 path"),
                 &token,
@@ -695,6 +711,27 @@ fn verify_without_key_file_exits_3() {
 }
 
 #[test]
+fn verify_without_expected_algorithm_exits_3() {
+    let secret = b"test-secret-key-at-least-32-bytes-long!";
+    let token = hmac_token(secret, json!({ "sub": "Missing Expected Algorithm" }));
+    let key_file = key_file(secret);
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args([
+            "--verify",
+            "--key-file",
+            key_file.path().to_str().expect("utf-8 path"),
+            &token,
+        ])
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains(
+            "expected signing algorithm not provided (--algorithm required)",
+        ));
+}
+
+#[test]
 fn missing_key_file_exits_3() {
     let token = unsigned_token(json!({ "sub": "Missing Key File" }));
 
@@ -702,6 +739,8 @@ fn missing_key_file_exits_3() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             "/tmp/jwtdebug-missing-key-file",
             &token,
@@ -717,7 +756,14 @@ fn directory_key_file_exits_3() {
 
     Command::cargo_bin("jwtdebug")
         .expect("binary exists")
-        .args(["--verify", "--key-file", ".", &token])
+        .args([
+            "--verify",
+            "--algorithm",
+            "HS256",
+            "--key-file",
+            ".",
+            &token,
+        ])
         .assert()
         .code(3)
         .stderr(predicate::str::contains("key file must be a regular file"));
@@ -732,6 +778,8 @@ fn oversized_key_file_exits_3() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -755,6 +803,8 @@ fn unreadable_key_file_exits_3() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -780,6 +830,8 @@ fn asymmetric_public_keys_cannot_be_used_as_hmac_secrets() {
             .expect("binary exists")
             .args([
                 "--verify",
+                "--algorithm",
+                "HS256",
                 "--key-file",
                 key_file.path().to_str().expect("utf-8 path"),
                 &token,
@@ -793,6 +845,31 @@ fn asymmetric_public_keys_cannot_be_used_as_hmac_secrets() {
 }
 
 #[test]
+fn expected_algorithm_blocks_asymmetric_key_confusion() {
+    let token = hmac_token(
+        RSA_PUBLIC_KEY.as_bytes(),
+        json!({ "sub": "Forged Human Being" }),
+    );
+    let key_file = key_file(RSA_PUBLIC_KEY.as_bytes());
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args([
+            "--verify",
+            "--algorithm",
+            "RS256",
+            "--key-file",
+            key_file.path().to_str().expect("utf-8 path"),
+            &token,
+        ])
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains(
+            "token signing algorithm HS256 does not match expected algorithm RS256",
+        ));
+}
+
+#[test]
 fn der_encoded_public_keys_cannot_be_used_as_hmac_secrets() {
     for public_key in [RSA_PUBLIC_KEY, EC_PUBLIC_KEY, ED_PUBLIC_KEY] {
         let der = pem_to_der(public_key);
@@ -803,6 +880,8 @@ fn der_encoded_public_keys_cannot_be_used_as_hmac_secrets() {
             .expect("binary exists")
             .args([
                 "--verify",
+                "--algorithm",
+                "HS256",
                 "--key-file",
                 key_file.path().to_str().expect("utf-8 path"),
                 &token,
@@ -825,6 +904,8 @@ fn short_hmac_key_warns_but_still_verifies() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -851,6 +932,8 @@ fn jwt_io_sample_token_verifies_with_its_own_secret() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             token,
@@ -873,6 +956,8 @@ fn token_with_aud_claim_verifies_successfully() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -895,6 +980,8 @@ fn expired_hmac_token_fails_unless_ignored() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -907,6 +994,8 @@ fn expired_hmac_token_fails_unless_ignored() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--ignore-expiration",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
@@ -927,6 +1016,8 @@ fn maximum_unsigned_exp_verifies_successfully() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -946,6 +1037,8 @@ fn unsigned_range_float_exp_verifies_successfully() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -965,6 +1058,8 @@ fn string_exp_is_enforced_during_verify() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -987,6 +1082,8 @@ fn fractional_string_exp_is_enforced_during_verify() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -1006,6 +1103,8 @@ fn string_nbf_is_enforced_during_verify() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -1025,6 +1124,8 @@ fn malformed_exp_fails_verify() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -1046,6 +1147,8 @@ fn unsupported_algorithm_exits_3() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "none",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -1067,6 +1170,8 @@ fn missing_algorithm_exits_3() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -1092,6 +1197,8 @@ fn asymmetric_algorithms_route_to_key_parsers() {
             .expect("binary exists")
             .args([
                 "--verify",
+                "--algorithm",
+                algorithm,
                 "--key-file",
                 key_file.path().to_str().expect("utf-8 path"),
                 &token,
@@ -1114,6 +1221,8 @@ fn es512_invalid_public_key_reports_parser_error() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "ES512",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -1135,6 +1244,8 @@ fn es512_malformed_signature_reports_signature_error() {
         .expect("binary exists")
         .args([
             "--verify",
+            "--algorithm",
+            "ES512",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
@@ -1156,6 +1267,8 @@ fn raw_claims_with_verify_failure_keeps_stdout_empty() {
         .args([
             "--raw-claims",
             "--verify",
+            "--algorithm",
+            "HS256",
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,

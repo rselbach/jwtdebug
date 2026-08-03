@@ -102,6 +102,7 @@ fn process_token(input: &str, flags: &cli::Flags) -> i32 {
         if let Err(err) = verification::verify_token_signature(
             &parsed,
             flags.key_file.as_deref(),
+            flags.algorithm.as_deref(),
             flags.ignore_expiration,
         ) {
             printer::print_verification_failure(&err);

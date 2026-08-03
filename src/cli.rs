@@ -45,6 +45,14 @@ struct Args {
     verify_signature: bool,
 
     #[arg(
+        long,
+        value_name = "algorithm",
+        requires = "verify_signature",
+        help = "expected signing algorithm for verification"
+    )]
+    algorithm: Option<String>,
+
+    #[arg(
         short = 'k',
         long = "key-file",
         value_name = "file",
@@ -86,6 +94,7 @@ struct Args {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Flags {
     pub key_file: Option<String>,
+    pub algorithm: Option<String>,
     pub header: bool,
     pub claims: bool,
     pub signature: bool,
@@ -125,6 +134,7 @@ where
     Ok((
         Flags {
             key_file,
+            algorithm: args.algorithm,
             header: args.header || args.show_all,
             claims: args.claims || args.show_all,
             signature: args.signature || args.show_all,
@@ -201,8 +211,9 @@ pub fn print_usage() {
     println!("    --raw-claims             output only raw claims JSON (for piping to jq)");
     println!();
     println!("  Verification:");
-    println!("    --verify, -V             verify token signature (requires --key-file)");
+    println!("    --verify, -V             verify token signature");
     println!("    --key-file, -k <file>    key file for signature verification");
+    println!("    --algorithm <algorithm>  expected signing algorithm (required for verify)");
     println!("    --ignore-expiration      ignore token expiration when verifying");
     println!();
     println!("  Input:");
@@ -220,7 +231,8 @@ Examples:
   echo "Bearer eyJ..." | jwtdebug   # Read from pipe (strips "Bearer " prefix)
   pbpaste | jwtdebug                # Decode token from clipboard (macOS)
   jwtdebug -a token                 # Show all parts (header, claims, signature, expiry)
-  jwtdebug -V -k pub.pem token      # Verify signature with public key
+  jwtdebug -V -k pub.pem --algorithm RS256 token
+                                      # Verify signature with public key
   jwtdebug --raw-claims token | jq  # Pipe claims to jq
 
 Exit Codes:

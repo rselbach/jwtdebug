@@ -32,6 +32,9 @@ pub enum VerificationError {
     #[error("key file not provided (--key-file / -k required)")]
     MissingKeyFile,
 
+    #[error("expected signing algorithm not provided (--algorithm required)")]
+    MissingExpectedAlgorithm,
+
     #[error("failed to open key file: {0}")]
     OpenKeyFile(#[source] std::io::Error),
 
@@ -49,6 +52,9 @@ pub enum VerificationError {
 
     #[error("unexpected signing method: {0}")]
     UnexpectedAlgorithm(String),
+
+    #[error("token signing algorithm {actual} does not match expected algorithm {expected}")]
+    AlgorithmMismatch { expected: String, actual: String },
 
     #[error("failed to decode token signature: {0}")]
     DecodeSignature(#[source] base64::DecodeError),
@@ -86,24 +92,36 @@ pub enum VerificationError {
 pub fn verify_token_signature(
     parsed: &ParsedToken,
     key_file: Option<&str>,
+    expected_algorithm: Option<&str>,
     ignore_expiration: bool,
 ) -> Result<(), VerificationError> {
     let key_file = key_file
         .filter(|key_file| !key_file.is_empty())
         .ok_or(VerificationError::MissingKeyFile)?;
 
+    let expected_algorithm = expected_algorithm
+        .filter(|algorithm| !algorithm.is_empty())
+        .ok_or(VerificationError::MissingExpectedAlgorithm)?;
+
     let key_data = read_key_file(key_file)?;
-    let algorithm_name = parsed
+    let token_algorithm = parsed
         .header
         .get("alg")
         .and_then(Value::as_str)
         .ok_or_else(|| VerificationError::UnexpectedAlgorithm("<missing>".to_string()))?;
-    if algorithm_name == "ES512" {
+    if token_algorithm != expected_algorithm {
+        return Err(VerificationError::AlgorithmMismatch {
+            expected: expected_algorithm.to_string(),
+            actual: token_algorithm.to_string(),
+        });
+    }
+
+    if expected_algorithm == "ES512" {
         return verify_es512(parsed, &key_data, ignore_expiration);
     }
 
-    let algorithm = Algorithm::from_str(algorithm_name)
-        .map_err(|_| VerificationError::UnexpectedAlgorithm(algorithm_name.to_string()))?;
+    let algorithm = Algorithm::from_str(expected_algorithm)
+        .map_err(|_| VerificationError::UnexpectedAlgorithm(expected_algorithm.to_string()))?;
     let key = decoding_key(algorithm, &key_data)?;
 
     let mut validation = Validation::new(algorithm);
@@ -444,6 +462,7 @@ mod tests {
         let err = verify_token_signature(
             &parsed,
             Some(key_file.path().to_str().expect("utf-8 path")),
+            Some("ES512"),
             false,
         );
         assert!(err.is_ok(), "expected ES512 verification to pass: {err:?}");
@@ -477,6 +496,7 @@ mod tests {
         let err = verify_token_signature(
             &parsed,
             Some(key_file.path().to_str().expect("utf-8 path")),
+            Some("ES512"),
             false,
         );
         assert!(
@@ -510,11 +530,11 @@ mod tests {
         let key_file = key_file.path().to_str().expect("utf-8 path");
         let parsed = parser::parse_token(&token).expect("parse token");
 
-        let err =
-            verify_token_signature(&parsed, Some(key_file), false).expect_err("expired token");
+        let err = verify_token_signature(&parsed, Some(key_file), Some("ES512"), false)
+            .expect_err("expired token");
         assert!(matches!(err, VerificationError::TokenExpired));
 
-        let err = verify_token_signature(&parsed, Some(key_file), true);
+        let err = verify_token_signature(&parsed, Some(key_file), Some("ES512"), true);
         assert!(
             err.is_ok(),
             "expected expired ES512 token to pass with ignore-expiration: {err:?}"
