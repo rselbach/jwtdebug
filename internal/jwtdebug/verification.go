@@ -180,6 +180,10 @@ func prepareVerificationKey(
 }
 
 func parsePublicKeyPEM(data []byte) (any, error) {
+	data = bytes.TrimSpace(data)
+	if !bytes.HasPrefix(data, []byte("-----BEGIN ")) {
+		return nil, errors.New("invalid PEM data")
+	}
 	block, rest := pem.Decode(data)
 	if block == nil {
 		return nil, errors.New("invalid PEM data")

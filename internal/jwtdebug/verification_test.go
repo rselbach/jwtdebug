@@ -175,13 +175,26 @@ func TestPublicKeyPEMRejectsAdditionalData(t *testing.T) {
 	}
 	key := publicKeyPEM(t, &privateKey.PublicKey)
 
-	for name, data := range map[string][]byte{
-		"trailing data":   append(append([]byte(nil), key...), []byte("unexpected")...),
-		"multiple blocks": append(append([]byte(nil), key...), key...),
+	for name, tc := range map[string]struct {
+		data []byte
+		want string
+	}{
+		"leading data": {
+			data: append([]byte("unexpected"), key...),
+			want: "invalid PEM data",
+		},
+		"trailing data": {
+			data: append(append([]byte(nil), key...), []byte("unexpected")...),
+			want: "multiple blocks or trailing data",
+		},
+		"multiple blocks": {
+			data: append(append([]byte(nil), key...), key...),
+			want: "multiple blocks or trailing data",
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if _, err := parsePublicKeyPEM(data); err == nil ||
-				!strings.Contains(err.Error(), "multiple blocks or trailing data") {
+			if _, err := parsePublicKeyPEM(tc.data); err == nil ||
+				!strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("error = %v", err)
 			}
 		})
