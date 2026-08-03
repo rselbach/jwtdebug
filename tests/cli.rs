@@ -344,6 +344,60 @@ fn multiple_token_arguments_are_processed_in_order() {
 }
 
 #[test]
+fn every_token_argument_is_processed_despite_failures() {
+    let first = unsigned_token(json!({ "sub": "First Token" }));
+    let last = unsigned_token(json!({ "sub": "Last Token" }));
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args([first.as_str(), "not-a-valid-token", last.as_str()])
+        .assert()
+        .code(2)
+        .stdout(predicate::str::contains("First Token"))
+        .stdout(predicate::str::contains("Last Token"))
+        .stderr(predicate::str::contains("invalid token format"));
+}
+
+#[test]
+fn every_stdin_line_is_processed_despite_failures() {
+    let first = unsigned_token(json!({ "sub": "First Token" }));
+    let last = unsigned_token(json!({ "sub": "Last Token" }));
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .write_stdin(format!("{first}\nnot-a-valid-token\n{last}\n"))
+        .assert()
+        .code(2)
+        .stdout(predicate::str::contains("First Token"))
+        .stdout(predicate::str::contains("Last Token"));
+}
+
+#[test]
+fn the_first_failure_sets_the_exit_code() {
+    // An unparseable token (2) ahead of a verification failure (3). Those
+    // codes name different problems rather than different severities, so the
+    // first one is reported rather than the last or the larger.
+    let secret = b"test-secret-key-at-least-32-bytes-long!";
+    let wrong_secret = b"wrong-secret-key-at-least-32-bytes!!!!!";
+    let token = hmac_token(secret, json!({ "sub": "Annie Edison" }));
+    let key_file = key_file(wrong_secret);
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args([
+            "--verify",
+            "--key-file",
+            key_file.path().to_str().expect("utf-8 path"),
+            "not-a-valid-token",
+            token.as_str(),
+        ])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("invalid token format"))
+        .stderr(predicate::str::contains("signature is invalid"));
+}
+
+#[test]
 fn piped_stdin_decodes_token() {
     let token = unsigned_token(json!({ "sub": "Pipe Test" }));
 

@@ -59,14 +59,23 @@ fn process_input_tokens(flags: &cli::Flags, args: &[String]) -> i32 {
         [] => process_from_stdin(flags, false),
         [arg] if arg == "-" => process_from_stdin(flags, true),
         _ => {
+            let mut exit_code = EXIT_SUCCESS;
             for token in args {
-                let exit_code = process_token(token, flags);
-                if exit_code != EXIT_SUCCESS {
-                    return exit_code;
-                }
+                exit_code = retain_first_failure(exit_code, process_token(token, flags));
             }
-            EXIT_SUCCESS
+            exit_code
         }
+    }
+}
+
+/// Report the first failure seen. Exit codes 2 and 3 describe different
+/// problems rather than different severities, so there is no worst one to
+/// pick; the first is the one the user can act on.
+fn retain_first_failure(seen: i32, current: i32) -> i32 {
+    if seen == EXIT_SUCCESS {
+        current
+    } else {
+        seen
     }
 }
 
@@ -186,6 +195,7 @@ fn process_from_stdin(flags: &cli::Flags, explicit: bool) -> i32 {
     }
 
     let mut has_token = false;
+    let mut exit_code = EXIT_SUCCESS;
     for line in stdin.lock().lines() {
         let line = match line {
             Ok(line) => line,
@@ -201,10 +211,7 @@ fn process_from_stdin(flags: &cli::Flags, explicit: bool) -> i32 {
         }
 
         has_token = true;
-        let exit_code = process_token(line, flags);
-        if exit_code != EXIT_SUCCESS {
-            return exit_code;
-        }
+        exit_code = retain_first_failure(exit_code, process_token(line, flags));
     }
 
     if !has_token {
@@ -212,7 +219,7 @@ fn process_from_stdin(flags: &cli::Flags, explicit: bool) -> i32 {
         return EXIT_ERROR;
     }
 
-    EXIT_SUCCESS
+    exit_code
 }
 
 fn print_usage_hint() {
