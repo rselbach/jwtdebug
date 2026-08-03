@@ -549,6 +549,28 @@ fn hmac_verify_success_prints_success_message() {
 }
 
 #[test]
+fn wrong_hmac_secret_reports_an_invalid_signature() {
+    let secret = b"test-secret-key-at-least-32-bytes-long!";
+    let wrong_secret = b"wrong-secret-key-at-least-32-bytes!!!!!";
+    let token = hmac_token(secret, json!({ "sub": "Ben Chang" }));
+    let key_file = key_file(wrong_secret);
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args([
+            "--verify",
+            "--key-file",
+            key_file.path().to_str().expect("utf-8 path"),
+            &token,
+        ])
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains(
+            "Signature verification failed: signature is invalid",
+        ));
+}
+
+#[test]
 fn pem_backed_algorithms_verify_successfully() {
     for (algorithm, private_key, public_key, subject) in [
         (Algorithm::RS256, RSA_PRIVATE_KEY, RSA_PUBLIC_KEY, "RS256"),

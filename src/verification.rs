@@ -4,6 +4,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
+use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use p521::ecdsa::signature::Verifier;
 use p521::ecdsa::{Signature, VerifyingKey};
@@ -118,11 +119,20 @@ pub fn verify_token_signature(
     validation.validate_exp = false;
     validation.validate_nbf = false;
 
-    decode::<Value>(&parsed.raw, &key, &validation)?;
+    decode::<Value>(&parsed.raw, &key, &validation).map_err(map_jwt_error)?;
     if !ignore_expiration {
         validate_time_claims(&parsed.claims)?;
     }
     Ok(())
+}
+
+/// Translate a rejected signature into our own wording, so every algorithm
+/// reports it the same way. Anything else keeps jsonwebtoken's own message.
+fn map_jwt_error(err: jsonwebtoken::errors::Error) -> VerificationError {
+    match err.kind() {
+        ErrorKind::InvalidSignature => VerificationError::SignatureInvalid,
+        _ => VerificationError::Jwt(err),
+    }
 }
 
 fn decoding_key(algorithm: Algorithm, key_data: &[u8]) -> Result<DecodingKey, VerificationError> {
