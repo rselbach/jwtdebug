@@ -204,13 +204,10 @@ fn validate_time_claims(claims: &Map<String, Value>) -> Result<(), VerificationE
 fn validate_time_claims_at(claims: &Map<String, Value>, now: i64) -> Result<(), VerificationError> {
     match classify_time_claim(claims, "exp") {
         TimeClaim::Absent => {}
-        TimeClaim::Invalid => {
+        TimeClaim::Invalid(value) => {
             return Err(VerificationError::InvalidTimeClaim {
                 claim: "exp",
-                value: claims
-                    .get("exp")
-                    .map(ToString::to_string)
-                    .unwrap_or_else(|| "<missing>".to_string()),
+                value: value.to_string(),
             });
         }
         TimeClaim::Valid(exp) if exp.is_before(now.saturating_sub(LEEWAY_SECONDS)) => {
@@ -221,13 +218,10 @@ fn validate_time_claims_at(claims: &Map<String, Value>, now: i64) -> Result<(), 
 
     match classify_time_claim(claims, "nbf") {
         TimeClaim::Absent => {}
-        TimeClaim::Invalid => {
+        TimeClaim::Invalid(value) => {
             return Err(VerificationError::InvalidTimeClaim {
                 claim: "nbf",
-                value: claims
-                    .get("nbf")
-                    .map(ToString::to_string)
-                    .unwrap_or_else(|| "<missing>".to_string()),
+                value: value.to_string(),
             });
         }
         TimeClaim::Valid(nbf) if nbf.is_after(now.saturating_add(LEEWAY_SECONDS)) => {

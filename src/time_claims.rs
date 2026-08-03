@@ -49,22 +49,26 @@ impl NumericDate {
 
 /// Result of reading a JWT time claim (`exp`, `nbf`, `iat`).
 #[derive(Debug, Clone, PartialEq)]
-pub enum TimeClaim {
+pub enum TimeClaim<'a> {
     /// Claim key is absent from the payload.
     Absent,
-    /// Claim is present but not a usable NumericDate (or RFC3339 string).
-    Invalid,
+    /// Claim is present but not a usable NumericDate (or RFC3339 string),
+    /// carrying the raw value so callers can report it.
+    Invalid(&'a Value),
     /// Claim parsed to a NumericDate-like value.
     Valid(NumericDate),
 }
 
 /// Classify a named time claim from a JWT claims object.
-pub fn classify_time_claim(claims: &serde_json::Map<String, Value>, name: &str) -> TimeClaim {
+pub fn classify_time_claim<'a>(
+    claims: &'a serde_json::Map<String, Value>,
+    name: &str,
+) -> TimeClaim<'a> {
     match claims.get(name) {
         None => TimeClaim::Absent,
         Some(value) => match parse_numeric_date(value) {
             Some(timestamp) => TimeClaim::Valid(timestamp),
-            None => TimeClaim::Invalid,
+            None => TimeClaim::Invalid(value),
         },
     }
 }
@@ -200,7 +204,10 @@ mod tests {
             .cloned()
             .expect("object");
         assert_eq!(TimeClaim::Absent, classify_time_claim(&claims, "iat"));
-        assert_eq!(TimeClaim::Invalid, classify_time_claim(&claims, "exp"));
+        assert_eq!(
+            TimeClaim::Invalid(&json!(true)),
+            classify_time_claim(&claims, "exp")
+        );
         assert_eq!(
             TimeClaim::Valid(NumericDate::Integer(1_700_000_000)),
             classify_time_claim(&claims, "nbf")

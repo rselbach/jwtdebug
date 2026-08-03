@@ -25,11 +25,7 @@ pub fn check_expiration(claims: &Map<String, Value>) {
             (exp.rounded_seconds() - now_wide).max(0)
         ),
         TimeClaim::Absent => println!("No expiration claim found"),
-        TimeClaim::Invalid => {
-            if let Some(value) = claims.get("exp") {
-                println!("Unrecognized exp value: {value}");
-            }
-        }
+        TimeClaim::Invalid(value) => println!("Unrecognized exp value: {value}"),
     }
 
     match classify_time_claim(claims, "nbf") {
@@ -43,11 +39,7 @@ pub fn check_expiration(claims: &Map<String, Value>) {
             format_timestamp(nbf.rounded_seconds()),
             (now_wide - nbf.rounded_seconds()).max(0)
         ),
-        TimeClaim::Invalid => {
-            if let Some(value) = claims.get("nbf") {
-                println!("Unrecognized nbf value: {value}");
-            }
-        }
+        TimeClaim::Invalid(value) => println!("Unrecognized nbf value: {value}"),
         TimeClaim::Absent => {}
     }
 
@@ -62,11 +54,7 @@ pub fn check_expiration(claims: &Map<String, Value>) {
             format_timestamp(iat.rounded_seconds()),
             (now_wide - iat.rounded_seconds()).max(0)
         ),
-        TimeClaim::Invalid => {
-            if let Some(value) = claims.get("iat") {
-                println!("Unrecognized iat value: {value}");
-            }
-        }
+        TimeClaim::Invalid(value) => println!("Unrecognized iat value: {value}"),
         TimeClaim::Absent => {}
     }
 
