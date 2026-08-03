@@ -70,13 +70,14 @@ func TestResolveToken(t *testing.T) {
 		strict  bool
 		wantErr bool
 	}{
-		"exact":                  {input: token},
-		"trims exact":            {input: "  " + token + "  ", strict: true},
-		"bearer":                 {input: "Bearer " + token},
-		"cookie":                 {input: "session=" + token + "; HttpOnly"},
-		"JSON":                   {input: `{"access_token":"` + token + `"}`},
-		"strict rejects bearer":  {input: "Bearer " + token, strict: true, wantErr: true},
-		"embedded word rejected": {input: "prefix" + token + "suffix", wantErr: true},
+		"exact":                   {input: token},
+		"trims exact":             {input: "  " + token + "  ", strict: true},
+		"bearer":                  {input: "Bearer " + token},
+		"cookie":                  {input: "session=" + token + "; HttpOnly"},
+		"JSON":                    {input: `{"access_token":"` + token + `"}`},
+		"skips invalid candidate": {input: "abc.def.ghi " + token},
+		"strict rejects bearer":   {input: "Bearer " + token, strict: true, wantErr: true},
+		"embedded word rejected":  {input: "prefix" + token + "suffix", wantErr: true},
 	}
 
 	for name, tc := range tests {

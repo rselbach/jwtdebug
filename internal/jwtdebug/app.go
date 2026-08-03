@@ -71,13 +71,17 @@ func (p *tokenProcessor) processInputs(
 	if len(tokens) == 0 {
 		return p.processStdin(stdin, stdinIsTerminal, false)
 	}
-	if len(tokens) == 1 && tokens[0] == "-" {
-		return p.processStdin(stdin, stdinIsTerminal, true)
-	}
 
 	exitCode := exitSuccess
+	stdinConsumed := false
 	for _, token := range tokens {
 		if token == "-" {
+			if stdinConsumed {
+				p.out.stderrLine("Error: stdin marker '-' may only be specified once")
+				exitCode = retainFirstFailure(exitCode, exitError)
+				continue
+			}
+			stdinConsumed = true
 			exitCode = retainFirstFailure(
 				exitCode,
 				p.processStdin(stdin, stdinIsTerminal, true),

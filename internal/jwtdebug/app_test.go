@@ -208,6 +208,16 @@ func TestCLIReadsExplicitStdinAmongArguments(t *testing.T) {
 	}
 }
 
+func TestCLIRejectsDuplicateStdinMarkers(t *testing.T) {
+	token := unsignedJWT(t, map[string]any{"sub": "Single Stdin Read"})
+	result := runCLI(t, []string{"--quiet", "-", "-"}, token+"\n")
+	if result.exitCode != exitError ||
+		!strings.Contains(result.stderr, "stdin marker '-' may only be specified once") ||
+		strings.Count(result.stdout, "Single Stdin Read") != 1 {
+		t.Fatalf("result = %+v", result)
+	}
+}
+
 func TestCLIRejectsOversizedInputsAndContinuesStdin(t *testing.T) {
 	atLimit := runCLI(t, []string{strings.Repeat("x", maxTokenInputSize)}, "")
 	if strings.Contains(atLimit.stderr, "exceeds maximum size") {

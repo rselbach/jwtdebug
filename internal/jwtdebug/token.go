@@ -74,11 +74,17 @@ func resolveToken(input string, strict bool) (parsedToken, error) {
 		return parsedToken{}, exactErr
 	}
 
-	for _, match := range jwtPattern.FindAllStringIndex(input, -1) {
-		if !hasExtractionBoundaries(input, match[0], match[1]) {
+	for offset := 0; offset < len(input); {
+		match := jwtPattern.FindStringIndex(input[offset:])
+		if match == nil {
+			break
+		}
+		start, end := offset+match[0], offset+match[1]
+		offset = end
+		if !hasExtractionBoundaries(input, start, end) {
 			continue
 		}
-		candidate, err := parseToken(input[match[0]:match[1]])
+		candidate, err := parseToken(input[start:end])
 		if err == nil {
 			return candidate, nil
 		}
