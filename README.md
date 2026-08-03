@@ -71,6 +71,8 @@ sudo mv jwtdebug /usr/local/bin/
 
 ### From Source
 
+Requires Rust 1.88 or newer.
+
 ```bash
 git clone https://github.com/rselbach/jwtdebug.git
 cd jwtdebug
@@ -81,10 +83,14 @@ make build
 ## Usage
 
 ```
-jwtdebug [options] <token>
+jwtdebug [options] <token> [token ...]
 jwtdebug [options] -           # read from stdin explicitly
 command | jwtdebug [options]   # read from pipe
 ```
+
+Every positional token, or every non-empty line from stdin, is processed in
+order. If any input fails, the process exits with the first failure's code
+after processing the remaining inputs.
 
 ### Display Options
 
@@ -92,9 +98,9 @@ command | jwtdebug [options]   # read from pipe
 |------|-------|-------------|
 | `--all` | `-a` | Show all token parts and info |
 | `--header` | `-H` | Show token header |
-| `--claims` | `-c` | Show token claims (default: true) |
+| `--claims` | `-c` | Show token claims (default: true; disable with `--claims=false`) |
 | `--signature` | `-s` | Show token signature |
-| `--expiration` | `-e` | Check token expiration status |
+| `--expiration` | `-e` | Check token expiration status (timestamps use UTC) |
 | `--raw-claims` | | Output only raw claims JSON (for piping) |
 
 ### Verification Options
@@ -104,7 +110,7 @@ command | jwtdebug [options]   # read from pipe
 | `--verify` | `-V` | Verify token signature |
 | `--key-file` | `-k` | Key file for signature verification |
 | `--algorithm` | | Expected signing algorithm (required for verification) |
-| `--ignore-expiration` | | Ignore token expiration when verifying |
+| `--ignore-expiration` | | Ignore `exp` when verifying; `nbf` remains enforced |
 
 ### Input Options
 
@@ -235,10 +241,15 @@ jwtdebug/
 │   ├── constants.rs     # Exit codes and limits
 │   ├── expiration.rs    # Expiration checking
 │   ├── main.rs          # Entry point and flow control
+│   ├── output.rs        # Fallible stdout and stderr handling
 │   ├── parser.rs        # JWT parsing and smart extraction
 │   ├── printer.rs       # Output formatting
+│   ├── time_claims.rs   # NumericDate parsing and comparison
 │   └── verification.rs  # Signature verification
-└── tests/               # CLI integration tests
+└── tests/
+    ├── common/          # Shared integration-test fixtures
+    ├── cli.rs           # CLI behavior tests
+    └── verification.rs  # Verification integration tests
 ```
 
 ## Contributing
