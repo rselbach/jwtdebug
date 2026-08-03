@@ -145,6 +145,22 @@ fn invalid_token_exits_2() {
 }
 
 #[test]
+fn invalid_signature_encoding_exits_2() {
+    let token = format!(
+        "{}.{}.@@@",
+        URL_SAFE_NO_PAD.encode(r#"{"alg":"HS256","typ":"JWT"}"#),
+        URL_SAFE_NO_PAD.encode(r#"{"sub":"Annie Edison"}"#)
+    );
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .arg(token)
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("failed to decode token signature"));
+}
+
+#[test]
 fn header_flag_prints_header_block() {
     let token = unsigned_token(json!({ "sub": "Header Test" }));
 
