@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"os"
 	"strings"
 	"testing"
 )
@@ -336,6 +337,14 @@ func (brokenWriter) Write([]byte) (int, error) {
 	return 0, io.ErrClosedPipe
 }
 
+type errorWriter struct {
+	err error
+}
+
+func (w errorWriter) Write([]byte) (int, error) {
+	return 0, w.err
+}
+
 func TestBrokenPipeExitsSuccessfully(t *testing.T) {
 	out := newOutput(brokenWriter{}, io.Discard)
 	exitCode := run([]string{"--help"}, strings.NewReader(""), false, out)
@@ -345,5 +354,53 @@ func TestBrokenPipeExitsSuccessfully(t *testing.T) {
 	}
 	if got := finalExitCode(exitCode, err); got != exitSuccess {
 		t.Fatalf("final exit code = %d", got)
+	}
+}
+
+func TestOutputStreamsFailIndependently(t *testing.T) {
+	writeErr := errors.New("write failed")
+
+	t.Run("stdout failure preserves stderr", func(t *testing.T) {
+		var stderr strings.Builder
+		out := newOutput(errorWriter{err: writeErr}, &stderr)
+		out.stdoutLine("failed")
+		out.stderrLine("diagnostic")
+		if !errors.Is(out.finish(), writeErr) {
+			t.Fatalf("output error = %v, want %v", out.finish(), writeErr)
+		}
+		if stderr.String() != "diagnostic\n" {
+			t.Fatalf("stderr = %q", stderr.String())
+		}
+	})
+
+	t.Run("stderr failure preserves stdout", func(t *testing.T) {
+		var stdout strings.Builder
+		out := newOutput(&stdout, errorWriter{err: writeErr})
+		out.stderrLine("failed")
+		out.stdoutLine("result")
+		if !errors.Is(out.finish(), writeErr) {
+			t.Fatalf("output error = %v, want %v", out.finish(), writeErr)
+		}
+		if stdout.String() != "result\n" {
+			t.Fatalf("stdout = %q", stdout.String())
+		}
+	})
+}
+
+func TestRunDoesNotMaskOutputFailureWithDiagnosticBrokenPipe(t *testing.T) {
+	stdin, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatalf("open null device: %v", err)
+	}
+	t.Cleanup(func() { _ = stdin.Close() })
+
+	exitCode := Run(
+		[]string{"--help"},
+		stdin,
+		errorWriter{err: errors.New("output failed")},
+		brokenWriter{},
+	)
+	if exitCode != exitError {
+		t.Fatalf("exit code = %d, want %d", exitCode, exitError)
 	}
 }

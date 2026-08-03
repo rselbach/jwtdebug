@@ -1,15 +1,17 @@
 package jwtdebug
 
 import (
+	"errors"
 	"fmt"
 	"io"
 )
 
-// output writes application output and retains the first write error.
+// output writes application output and retains the first error for each stream.
 type output struct {
-	stdout io.Writer
-	stderr io.Writer
-	err    error
+	stdout    io.Writer
+	stderr    io.Writer
+	stdoutErr error
+	stderrErr error
 }
 
 func newOutput(stdout, stderr io.Writer) *output {
@@ -17,37 +19,37 @@ func newOutput(stdout, stderr io.Writer) *output {
 }
 
 func (o *output) stdoutLine(format string, args ...any) {
-	if o.err != nil {
+	if o.stdoutErr != nil {
 		return
 	}
 
-	_, o.err = fmt.Fprintf(o.stdout, format+"\n", args...)
+	_, o.stdoutErr = fmt.Fprintf(o.stdout, format+"\n", args...)
 }
 
 func (o *output) stderrLine(format string, args ...any) {
-	if o.err != nil {
+	if o.stderrErr != nil {
 		return
 	}
 
-	_, o.err = fmt.Fprintf(o.stderr, format+"\n", args...)
+	_, o.stderrErr = fmt.Fprintf(o.stderr, format+"\n", args...)
 }
 
 func (o *output) stdoutText(text string) {
-	if o.err != nil {
+	if o.stdoutErr != nil {
 		return
 	}
 
-	_, o.err = io.WriteString(o.stdout, text)
+	_, o.stdoutErr = io.WriteString(o.stdout, text)
 }
 
 func (o *output) stderrText(text string) {
-	if o.err != nil {
+	if o.stderrErr != nil {
 		return
 	}
 
-	_, o.err = io.WriteString(o.stderr, text)
+	_, o.stderrErr = io.WriteString(o.stderr, text)
 }
 
 func (o *output) finish() error {
-	return o.err
+	return errors.Join(o.stdoutErr, o.stderrErr)
 }
