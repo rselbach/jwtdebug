@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaced the P-521 release candidate with stable `p521` 0.14 and declared
   Rust 1.88 as the minimum supported compiler required by the locked dependency
   graph
+- CI now tests Linux, macOS, and Windows from one matrix and checks the declared
+  Rust 1.88 minimum; the redundant build-only job was removed
 - **BREAKING**: signature verification now requires `--algorithm`, so the
   expected algorithm comes from the user rather than the untrusted token header
 - **BREAKING**: `--help` writes to stdout instead of stderr, so it can be piped

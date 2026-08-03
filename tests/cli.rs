@@ -288,6 +288,7 @@ fn expiration_report_handles_minimum_timestamp() {
         .stdout(predicate::str::contains("Issued at: -9223372036854775808"));
 }
 
+#[cfg(unix)]
 #[test]
 fn expiration_report_handles_timezone_shifted_boundary_timestamps() {
     // These timestamps are in range as UTC instants, but shifting them into a
@@ -327,6 +328,7 @@ fn expiration_report_states_future_iat_as_time_remaining() {
         .stdout(predicate::str::contains("seconds ago").not());
 }
 
+#[cfg(unix)]
 #[test]
 fn expiration_report_uses_the_offset_in_effect_at_each_timestamp() {
     // One winter and one summer instant in a DST-observing zone: no single
