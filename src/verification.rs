@@ -8,7 +8,8 @@ use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use p521::ecdsa::signature::Verifier;
 use p521::ecdsa::{Signature, VerifyingKey};
-use p521::pkcs8::DecodePublicKey;
+use p521::pkcs8::der::Decode;
+use p521::pkcs8::{DecodePublicKey, SubjectPublicKeyInfoRef};
 use serde_json::{Map, Value};
 use thiserror::Error;
 
@@ -196,6 +197,10 @@ fn is_asymmetric_key(key_data: &[u8]) -> bool {
         || DecodingKey::from_ed_pem(key_data).is_ok()
         || std::str::from_utf8(key_data)
             .is_ok_and(|key_pem| VerifyingKey::from_public_key_pem(key_pem).is_ok())
+        // Every probe above expects PEM, so a raw DER SubjectPublicKeyInfo --
+        // the same key material without the base64 wrapper -- walked straight
+        // past them and got used as an HMAC secret.
+        || SubjectPublicKeyInfoRef::from_der(key_data).is_ok()
 }
 
 fn verify_es512(

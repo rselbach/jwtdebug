@@ -2,7 +2,7 @@ use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use assert_cmd::Command;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use base64::Engine;
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use predicates::prelude::*;
@@ -109,6 +109,15 @@ fn pem_token(algorithm: Algorithm, private_key: &str, claims: serde_json::Value)
         };
 
     encode(&Header::new(algorithm), &claims, &encoding_key).expect("sign PEM-backed test token")
+}
+
+fn pem_to_der(pem: &str) -> Vec<u8> {
+    let body: String = pem
+        .lines()
+        .filter(|line| !line.starts_with("-----"))
+        .collect();
+
+    STANDARD.decode(body).expect("decode PEM body")
 }
 
 fn key_file(contents: &[u8]) -> NamedTempFile {
@@ -712,6 +721,29 @@ fn asymmetric_public_keys_cannot_be_used_as_hmac_secrets() {
             json!({ "sub": "Forged Human Being" }),
         );
         let key_file = key_file(public_key.as_bytes());
+
+        Command::cargo_bin("jwtdebug")
+            .expect("binary exists")
+            .args([
+                "--verify",
+                "--key-file",
+                key_file.path().to_str().expect("utf-8 path"),
+                &token,
+            ])
+            .assert()
+            .code(3)
+            .stderr(predicate::str::contains(
+                "HMAC key file contains an asymmetric key",
+            ));
+    }
+}
+
+#[test]
+fn der_encoded_public_keys_cannot_be_used_as_hmac_secrets() {
+    for public_key in [RSA_PUBLIC_KEY, EC_PUBLIC_KEY, ED_PUBLIC_KEY] {
+        let der = pem_to_der(public_key);
+        let token = hmac_token(&der, json!({ "sub": "Forged Human Being" }));
+        let key_file = key_file(&der);
 
         Command::cargo_bin("jwtdebug")
             .expect("binary exists")
