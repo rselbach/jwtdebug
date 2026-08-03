@@ -30,6 +30,13 @@ pub enum ParseError {
         source: Box<dyn std::error::Error + Send + Sync>,
     },
 
+    #[error("failed to decode token signature ({snippet}): {source}")]
+    InvalidSignature {
+        snippet: String,
+        #[source]
+        source: base64::DecodeError,
+    },
+
     #[error("token {segment} is not a JSON object")]
     NotAnObject { segment: &'static str },
 }
@@ -45,6 +52,12 @@ pub fn parse_token(token: &str) -> Result<ParsedToken, ParseError> {
 
     let header = decode_json_object(parts[0], token, "header")?;
     let claims = decode_json_object(parts[1], token, "claims")?;
+    URL_SAFE_NO_PAD
+        .decode(parts[2])
+        .map_err(|source| ParseError::InvalidSignature {
+            snippet: token_snippet(token),
+            source,
+        })?;
 
     Ok(ParsedToken {
         raw: token.to_string(),
@@ -56,15 +69,38 @@ pub fn parse_token(token: &str) -> Result<ParsedToken, ParseError> {
 
 pub fn resolve_token(input: &str, strict: bool) -> Result<ParsedToken, ParseError> {
     let input = input.trim();
+    let exact_error = match parse_token(input) {
+        Ok(parsed) => return Ok(parsed),
+        Err(err) => err,
+    };
+
     if !strict {
         for candidate in JWT_PATTERN.find_iter(input) {
+            if !has_extraction_boundaries(input, candidate.start(), candidate.end()) {
+                continue;
+            }
             if let Ok(parsed) = parse_token(candidate.as_str()) {
                 return Ok(parsed);
             }
         }
     }
 
-    parse_token(input)
+    Err(exact_error)
+}
+
+fn has_extraction_boundaries(input: &str, start: usize, end: usize) -> bool {
+    let before = input[..start].chars().next_back();
+    let after = input[end..].chars().next();
+
+    before.is_none_or(is_extraction_boundary) && after.is_none_or(is_extraction_boundary)
+}
+
+fn is_extraction_boundary(character: char) -> bool {
+    character.is_whitespace()
+        || matches!(
+            character,
+            '\'' | '"' | '(' | ')' | '[' | ']' | '{' | '}' | '<' | '>' | ',' | ';' | ':'
+        )
 }
 
 fn decode_json_object(
@@ -130,6 +166,29 @@ mod tests {
     fn rejects_invalid_part_count() {
         let err = parse_token("invalid.token").expect_err("invalid token");
         assert!(err.to_string().contains("invalid token format"));
+    }
+
+    #[test]
+    fn rejects_invalid_signature_encoding() {
+        let token = format!(
+            "{}.{}.@@@",
+            encode_segment(r#"{"alg":"HS256","typ":"JWT"}"#),
+            encode_segment(r#"{"sub":"Annie Edison"}"#)
+        );
+
+        let err = parse_token(&token).expect_err("invalid signature");
+        assert!(err.to_string().contains("failed to decode token signature"));
+    }
+
+    #[test]
+    fn smart_extraction_does_not_truncate_an_invalid_signature() {
+        let token = format!(
+            "{}.{}.@@@",
+            encode_segment(r#"{"alg":"HS256","typ":"JWT"}"#),
+            encode_segment(r#"{"sub":"Annie Edison"}"#)
+        );
+
+        assert!(resolve_token(&token, false).is_err());
     }
 
     #[test]
