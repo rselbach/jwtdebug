@@ -2,6 +2,8 @@ use std::ffi::OsString;
 
 use clap::{ArgAction, CommandFactory, Parser};
 
+use crate::output::Output;
+
 pub const VERSION: &str = match option_env!("JWTDEBUG_VERSION") {
     Some(version) => version,
     None => env!("CARGO_PKG_VERSION"),
@@ -109,7 +111,7 @@ pub struct Flags {
     pub strict: bool,
 }
 
-pub fn parse<I, T>(args: I) -> Result<(Flags, Vec<String>), clap::Error>
+pub fn parse<I, T>(args: I) -> Result<(Flags, Vec<String>, Vec<&'static str>), clap::Error>
 where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
@@ -117,14 +119,15 @@ where
     let args = normalize_go_style_flags(args);
     let args = Args::try_parse_from(args)?;
 
+    let mut warnings = Vec::new();
     if args.key_deprecated.is_some() {
-        eprintln!("Warning: --key is deprecated, use --key-file");
+        warnings.push("Warning: --key is deprecated, use --key-file");
     }
     if args.expiry_deprecated {
-        eprintln!("Warning: --expiry is deprecated, use --expiration");
+        warnings.push("Warning: --expiry is deprecated, use --expiration");
     }
     if args.ignore_exp_deprecated {
-        eprintln!("Warning: --ignore-exp is deprecated, use --ignore-expiration");
+        warnings.push("Warning: --ignore-exp is deprecated, use --ignore-expiration");
     }
 
     let key_file = args.key_file.or(args.key_deprecated);
@@ -149,6 +152,7 @@ where
             strict: args.strict,
         },
         args.tokens,
+        warnings,
     ))
 }
 
@@ -193,39 +197,39 @@ where
     normalized
 }
 
-pub fn print_usage() {
-    println!("JWT Debug Tool - Decode and analyze JWT tokens");
-    println!();
-    println!("Usage: jwtdebug [options] [token]");
-    println!("       jwtdebug [options] -           # read from stdin explicitly");
-    println!("       command | jwtdebug [options]   # read from pipe");
-    println!();
-    println!("If no token is provided, jwtdebug reads from stdin.");
-    println!();
-    println!("  Display:");
-    println!("    --header, -H             show token header");
-    println!("    --claims, -c             show token claims (payload)");
-    println!("    --signature, -s          show token signature");
-    println!("    --all, -a                show all token parts and info");
-    println!("    --expiration, -e         check token expiration status");
-    println!("    --raw-claims             output only raw claims JSON (for piping to jq)");
-    println!();
-    println!("  Verification:");
-    println!("    --verify, -V             verify token signature");
-    println!("    --key-file, -k <file>    key file for signature verification");
-    println!("    --algorithm <algorithm>  expected signing algorithm (required for verify)");
-    println!("    --ignore-expiration      ignore token expiration when verifying");
-    println!();
-    println!("  Input:");
-    println!("    --strict                 disable smart extraction (expect exact JWT input)");
-    println!();
-    println!("  Other:");
-    println!("    --help, -h               show help message");
-    println!("    --version                show version information");
-    println!("    --quiet, -q              suppress informational notices");
-    println!("    --verbose, -v            enable verbose output for debugging");
-    println!(
-        r#"
+pub fn print_usage(output: &mut Output<'_>) {
+    output.stdout_text(
+        r#"JWT Debug Tool - Decode and analyze JWT tokens
+
+Usage: jwtdebug [options] [token]
+       jwtdebug [options] -           # read from stdin explicitly
+       command | jwtdebug [options]   # read from pipe
+
+If no token is provided, jwtdebug reads from stdin.
+
+  Display:
+    --header, -H             show token header
+    --claims, -c             show token claims (payload)
+    --signature, -s          show token signature
+    --all, -a                show all token parts and info
+    --expiration, -e         check token expiration status
+    --raw-claims             output only raw claims JSON (for piping to jq)
+
+  Verification:
+    --verify, -V             verify token signature
+    --key-file, -k <file>    key file for signature verification
+    --algorithm <algorithm>  expected signing algorithm (required for verify)
+    --ignore-expiration      ignore token expiration when verifying
+
+  Input:
+    --strict                 disable smart extraction (expect exact JWT input)
+
+  Other:
+    --help, -h               show help message
+    --version                show version information
+    --quiet, -q              suppress informational notices
+    --verbose, -v            enable verbose output for debugging
+
 Examples:
   jwtdebug eyJhbGci...              # Decode a token
   echo "Bearer eyJ..." | jwtdebug   # Read from pipe (strips "Bearer " prefix)
@@ -242,7 +246,7 @@ Exit Codes:
   3  Signature verification failed
 
 For more information, see: https://github.com/rselbach/jwtdebug
-"#
+"#,
     );
 }
 
@@ -252,7 +256,7 @@ mod tests {
 
     #[test]
     fn all_flag_enables_everything() {
-        let (flags, _) = parse(["--all"]).expect("parse flags");
+        let (flags, _, _) = parse(["--all"]).expect("parse flags");
 
         assert!(flags.header);
         assert!(flags.claims);
@@ -262,13 +266,13 @@ mod tests {
 
     #[test]
     fn claims_can_be_disabled_go_style() {
-        let (flags, _) = parse(["-claims=false"]).expect("parse flags");
+        let (flags, _, _) = parse(["-claims=false"]).expect("parse flags");
         assert!(!flags.claims);
     }
 
     #[test]
     fn deprecated_key_alias_sets_key_file() {
-        let (flags, _) = parse(["-key", "somefile"]).expect("parse flags");
+        let (flags, _, _) = parse(["-key", "somefile"]).expect("parse flags");
         assert_eq!(Some("somefile".to_string()), flags.key_file);
     }
 }

@@ -1,51 +1,55 @@
 use serde_json::{json, Map, Value};
 
-pub fn print_header(header: &Map<String, Value>) {
-    println!("HEADER:");
-    println!(
+use crate::output::Output;
+
+pub fn print_header(header: &Map<String, Value>, output: &mut Output<'_>) {
+    output.stdout_line(format_args!("HEADER:"));
+    output.stdout_line(format_args!(
         "{}",
         serde_json::to_string_pretty(header).expect("header JSON should encode")
-    );
-    println!();
+    ));
+    output.stdout_line(format_args!(""));
 }
 
-pub fn print_claims(claims: &Map<String, Value>) {
-    println!("CLAIMS:");
-    println!(
+pub fn print_claims(claims: &Map<String, Value>, output: &mut Output<'_>) {
+    output.stdout_line(format_args!("CLAIMS:"));
+    output.stdout_line(format_args!(
         "{}",
         serde_json::to_string_pretty(claims).expect("claims JSON should encode")
-    );
-    println!();
+    ));
+    output.stdout_line(format_args!(""));
 }
 
-pub fn print_signature(signature: &str) {
-    println!("SIGNATURE:");
-    println!(
+pub fn print_signature(signature: &str, output: &mut Output<'_>) {
+    output.stdout_line(format_args!("SIGNATURE:"));
+    output.stdout_line(format_args!(
         "{}",
         serde_json::to_string_pretty(&json!({ "raw": signature }))
             .expect("signature JSON should encode")
-    );
-    println!();
+    ));
+    output.stdout_line(format_args!(""));
 }
 
-pub fn print_verification_success() {
-    println!("Signature verified successfully");
+pub fn print_verification_success(output: &mut Output<'_>) {
+    output.stdout_line(format_args!("Signature verified successfully"));
 }
 
-pub fn print_verification_failure(err: &dyn std::error::Error) {
-    eprintln!("Signature verification failed: {err}");
+pub fn print_verification_failure(err: &dyn std::error::Error, output: &mut Output<'_>) {
+    output.stderr_line(format_args!("Signature verification failed: {err}"));
 }
 
-pub fn print_weak_hmac_key_warning(actual: usize, minimum: usize) {
-    eprintln!(
+pub fn print_weak_hmac_key_warning(actual: usize, minimum: usize, output: &mut Output<'_>) {
+    output.stderr_line(format_args!(
         "Warning: HMAC key is {actual} bytes; RFC 7518 requires at least {minimum} for this algorithm"
-    );
+    ));
 }
 
-pub fn print_unverified_notice(quiet: bool) {
+pub fn print_unverified_notice(quiet: bool, output: &mut Output<'_>) {
     if quiet {
         return;
     }
 
-    eprintln!("Note: claims are unverified. Use --verify --key-file --algorithm to validate.");
+    output.stderr_line(format_args!(
+        "Note: claims are unverified. Use --verify --key-file --algorithm to validate."
+    ));
 }

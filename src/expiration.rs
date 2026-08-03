@@ -4,40 +4,59 @@ use serde_json::{Map, Value};
 use time::format_description::well_known::Rfc3339;
 use time::{OffsetDateTime, UtcOffset};
 
+use crate::output::Output;
 use crate::time_claims::{classify_time_claim, TimeClaim};
 
-pub fn check_expiration(claims: &Map<String, Value>) {
+pub fn check_expiration(claims: &Map<String, Value>, output: &mut Output<'_>) {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default();
 
-    println!("EXPIRATION:");
+    output.stdout_line(format_args!("EXPIRATION:"));
     match resolve(claims, "exp", now) {
-        Resolved::Past(at, ago) => println!("Token expired at {at} ({ago} seconds ago)"),
-        Resolved::Future(at, until) => {
-            println!("Token expires at {at} ({until} seconds from now)")
+        Resolved::Past(at, ago) => {
+            output.stdout_line(format_args!("Token expired at {at} ({ago} seconds ago)"));
         }
-        Resolved::Absent => println!("No expiration claim found"),
-        Resolved::Unrecognized(value) => println!("Unrecognized exp value: {value}"),
+        Resolved::Future(at, until) => {
+            output.stdout_line(format_args!(
+                "Token expires at {at} ({until} seconds from now)"
+            ));
+        }
+        Resolved::Absent => output.stdout_line(format_args!("No expiration claim found")),
+        Resolved::Unrecognized(value) => {
+            output.stdout_line(format_args!("Unrecognized exp value: {value}"));
+        }
     }
 
     match resolve(claims, "nbf", now) {
-        Resolved::Past(at, ago) => println!("Token valid since {at} ({ago} seconds ago)"),
+        Resolved::Past(at, ago) => {
+            output.stdout_line(format_args!("Token valid since {at} ({ago} seconds ago)"));
+        }
         Resolved::Future(at, until) => {
-            println!("Token not valid yet. Valid from {at} (in {until} seconds)")
+            output.stdout_line(format_args!(
+                "Token not valid yet. Valid from {at} (in {until} seconds)"
+            ));
         }
         Resolved::Absent => {}
-        Resolved::Unrecognized(value) => println!("Unrecognized nbf value: {value}"),
+        Resolved::Unrecognized(value) => {
+            output.stdout_line(format_args!("Unrecognized nbf value: {value}"));
+        }
     }
 
     match resolve(claims, "iat", now) {
-        Resolved::Past(at, ago) => println!("Issued at: {at} ({ago} seconds ago)"),
-        Resolved::Future(at, until) => println!("Issued at: {at} ({until} seconds from now)"),
+        Resolved::Past(at, ago) => {
+            output.stdout_line(format_args!("Issued at: {at} ({ago} seconds ago)"));
+        }
+        Resolved::Future(at, until) => {
+            output.stdout_line(format_args!("Issued at: {at} ({until} seconds from now)"));
+        }
         Resolved::Absent => {}
-        Resolved::Unrecognized(value) => println!("Unrecognized iat value: {value}"),
+        Resolved::Unrecognized(value) => {
+            output.stdout_line(format_args!("Unrecognized iat value: {value}"));
+        }
     }
 
-    println!();
+    output.stdout_line(format_args!(""));
 }
 
 /// A time claim reduced to what the report needs: a formatted local timestamp
