@@ -56,6 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   still rejected during signature verification
 - Integer and fractional `exp` values now expire consistently at subsecond
   boundaries
+- Non-regular key paths such as FIFOs are rejected before opening, avoiding a
+  blocking read when no writer is attached
 - Exit code now properly reflects verification failures
 - Expiration timestamps render in the UTC offset in effect at that timestamp
   rather than the one in effect today, so dates on the other side of a DST
