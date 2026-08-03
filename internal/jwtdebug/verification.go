@@ -146,6 +146,12 @@ func prepareVerificationKey(
 		if !ok {
 			return nil, nil, fmt.Errorf("failed to parse %s public key: expected RSA key", algorithm.name)
 		}
+		if key.N == nil || key.N.BitLen() < 2048 {
+			return nil, nil, fmt.Errorf(
+				"failed to parse %s public key: RSA modulus must be at least 2048 bits",
+				algorithm.name,
+			)
+		}
 		return key, nil, nil
 	case ecdsaAlgorithm:
 		key, ok := publicKey.(*ecdsa.PublicKey)
@@ -272,6 +278,9 @@ func (v *verifier) verify(token parsedToken, now time.Time) error {
 			v.expectedAlgorithm,
 		)
 	}
+	if err := validateProtectedHeader(token.header); err != nil {
+		return err
+	}
 
 	lastDot := strings.LastIndexByte(token.raw, '.')
 	if lastDot < 0 {
@@ -290,6 +299,22 @@ func (v *verifier) verify(token parsedToken, now time.Time) error {
 	}
 
 	return validateTimeClaimsAt(token.claims, now, v.ignoreExpiration)
+}
+
+func validateProtectedHeader(header map[string]any) error {
+	if value, ok := header["b64"]; ok {
+		encoded, ok := value.(bool)
+		if !ok {
+			return errors.New("invalid b64 header: expected a boolean")
+		}
+		if !encoded {
+			return errors.New("unsupported b64 header: false is not valid for JWTs")
+		}
+	}
+	if _, ok := header["crit"]; ok {
+		return errors.New("unsupported critical header parameters")
+	}
+	return nil
 }
 
 var errInvalidSignature = errors.New("signature is invalid")

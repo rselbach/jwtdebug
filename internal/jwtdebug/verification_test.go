@@ -4,9 +4,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"strings"
@@ -207,6 +210,80 @@ func TestExpectedAlgorithmBlocksConfusion(t *testing.T) {
 	if result.exitCode != exitVerificationFail ||
 		!strings.Contains(result.stderr, "token signing algorithm HS256 does not match expected algorithm RS256") {
 		t.Fatalf("result = %+v", result)
+	}
+}
+
+func TestUnsupportedProtectedHeadersFailVerification(t *testing.T) {
+	secret := []byte("test-secret-key-at-least-32-bytes-long!")
+	keyFile := writeTestKey(t, secret)
+	payload := base64.RawURLEncoding.EncodeToString(marshalTestJSON(t, map[string]any{
+		"sub": "Misinterpreted Payload",
+	}))
+
+	tests := map[string]struct {
+		header map[string]any
+		want   string
+	}{
+		"unencoded payload": {
+			header: map[string]any{"alg": "HS256", "b64": false, "crit": []string{"b64"}},
+			want:   "unsupported b64 header",
+		},
+		"malformed b64": {
+			header: map[string]any{"alg": "HS256", "b64": "false"},
+			want:   "invalid b64 header",
+		},
+		"unknown critical parameter": {
+			header: map[string]any{"alg": "HS256", "crit": []string{"example"}, "example": true},
+			want:   "unsupported critical header parameters",
+		},
+		"malformed critical parameter": {
+			header: map[string]any{"alg": "HS256", "crit": "example"},
+			want:   "unsupported critical header parameters",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			header := base64.RawURLEncoding.EncodeToString(marshalTestJSON(t, tc.header))
+			signingInput := header + "." + payload
+			mac := hmac.New(sha256.New, secret)
+			if _, err := mac.Write([]byte(signingInput)); err != nil {
+				t.Fatalf("sign token: %v", err)
+			}
+			token := signingInput + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+
+			result := runCLI(t, []string{
+				"--verify", "--algorithm", "HS256", "--key-file", keyFile, token,
+			}, "")
+			if result.exitCode != exitVerificationFail || !strings.Contains(result.stderr, tc.want) {
+				t.Fatalf("result = %+v, want error containing %q", result, tc.want)
+			}
+			if strings.Contains(result.stdout, "Misinterpreted Payload") ||
+				strings.Contains(result.stdout, "Signature verified successfully") {
+				t.Fatalf("verification emitted trusted output: %q", result.stdout)
+			}
+		})
+	}
+}
+
+func TestUndersizedRSAKeysAreRejected(t *testing.T) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		t.Fatalf("generate RSA key: %v", err)
+	}
+	keyFile := writeTestKey(t, publicKeyPEM(t, &privateKey.PublicKey))
+
+	for _, algorithm := range []string{"RS256", "PS256"} {
+		t.Run(algorithm, func(t *testing.T) {
+			token := signedJWT(t, algorithm, privateKey, map[string]any{"sub": algorithm})
+			result := runCLI(t, []string{
+				"--verify", "--algorithm", algorithm, "--key-file", keyFile, token,
+			}, "")
+			if result.exitCode != exitVerificationFail ||
+				!strings.Contains(result.stderr, "RSA modulus must be at least 2048 bits") {
+				t.Fatalf("result = %+v", result)
+			}
+		})
 	}
 }
 
