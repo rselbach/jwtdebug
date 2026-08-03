@@ -4,37 +4,32 @@ version: 2
 
 before:
   hooks:
-    - cargo fetch --locked
+    - go test ./...
 
 builds:
-  - id: linux
-    builder: rust
+  - id: jwtdebug
+    main: ./cmd/jwtdebug
     binary: jwtdebug
-    command: zigbuild
-    flags:
-      - --release
     env:
-      - JWTDEBUG_VERSION={{ .Version }}
-      - JWTDEBUG_COMMIT={{ .ShortCommit }}
-      - JWTDEBUG_BUILD_DATE={{ .Date }}
-    targets:
-      - x86_64-unknown-linux-gnu
-      - aarch64-unknown-linux-gnu
-
-  - id: default
-    builder: rust
-    binary: jwtdebug
-    command: zigbuild
+      - CGO_ENABLED=0
     flags:
-      - --release
-    env:
-      - JWTDEBUG_VERSION={{ .Version }}
-      - JWTDEBUG_COMMIT={{ .ShortCommit }}
-      - JWTDEBUG_BUILD_DATE={{ .Date }}
-    targets:
-      - x86_64-apple-darwin
-      - aarch64-apple-darwin
-      - x86_64-pc-windows-gnu
+      - -trimpath
+    ldflags:
+      - >-
+        -s -w
+        -X github.com/rselbach/jwtdebug/internal/jwtdebug.version={{ .Version }}
+        -X github.com/rselbach/jwtdebug/internal/jwtdebug.commit={{ .ShortCommit }}
+        -X github.com/rselbach/jwtdebug/internal/jwtdebug.buildDate={{ .Date }}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
 
 homebrew_casks:
   - binaries:
@@ -52,8 +47,7 @@ homebrew_casks:
 archives:
   - id: default
     ids:
-      - linux
-      - default
+      - jwtdebug
     formats: [tar.gz]
     name_template: >-
       {{ .ProjectName }}_

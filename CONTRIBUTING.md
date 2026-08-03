@@ -19,12 +19,13 @@ make test
 make install
 ```
 
-Requires a stable Rust toolchain.
+Requires Go 1.24 or newer. Install `goimports` and `golangci-lint` for the full
+local lint workflow.
 
 ## Code Style
 
-- Run `cargo fmt` before committing
-- Keep `cargo clippy -- -D warnings` clean
+- Run `goimports -w .` before committing
+- Keep `go vet ./...` and `golangci-lint run ./...` clean
 - Add focused unit or CLI integration tests for behavior changes
 - Keep it simple — avoid over-engineering
 

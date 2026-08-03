@@ -14,5 +14,5 @@ How was this tested?
 ## Checklist
 
 - [ ] Tests pass (`make test`)
-- [ ] Code follows project style (`cargo fmt`, `cargo clippy`)
+- [ ] Code follows project style (`goimports`, `go vet`, `golangci-lint`)
 - [ ] Documentation updated (if applicable)

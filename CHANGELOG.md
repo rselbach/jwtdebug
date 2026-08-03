@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Rewrote the codebase in idiomatic Go using only the standard library while
+  preserving the CLI, verification algorithms, output, and exit-code contract
+- Replaced the Cargo, Rust, and Zig build pipeline with native Go builds across
+  Linux, macOS, and Windows
 - Removed the nonfunctional AppImage release hook and its unverified rolling
   tool download; supported Linux archives and packages are unchanged
 - Migrated the deprecated GoReleaser Homebrew formula configuration to a cask
@@ -70,6 +74,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Smart extraction now recognizes `=` as a JWT boundary, so the documented
+  cookie and `Set-Cookie` inputs are actually decoded
 - `--ignore-expiration` skips only `exp`; future or malformed `nbf` claims are
   still rejected during signature verification
 - Integer and fractional `exp` values now expire consistently at subsecond
