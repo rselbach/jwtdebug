@@ -1131,6 +1131,31 @@ fn string_nbf_is_enforced_during_verify() {
 }
 
 #[test]
+fn ignore_expiration_still_enforces_nbf() {
+    let secret = b"test-secret-key-at-least-32-bytes-long!";
+    let token = hmac_token(
+        secret,
+        json!({ "sub": "Annie Edison", "exp": 1, "nbf": "2000000000" }),
+    );
+    let key_file = key_file(secret);
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args([
+            "--verify",
+            "--algorithm",
+            "HS256",
+            "--ignore-expiration",
+            "--key-file",
+            key_file.path().to_str().expect("utf-8 path"),
+            &token,
+        ])
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains("token is not valid yet"));
+}
+
+#[test]
 fn malformed_exp_fails_verify() {
     let secret = b"test-secret-key-at-least-32-bytes-long!";
     let token = hmac_token(secret, json!({ "sub": "Bad Exp", "exp": true }));

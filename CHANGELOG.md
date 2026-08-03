@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `--ignore-expiration` skips only `exp`; future or malformed `nbf` claims are
+  still rejected during signature verification
 - Exit code now properly reflects verification failures
 - Expiration timestamps render in the UTC offset in effect at that timestamp
   rather than the one in effect today, so dates on the other side of a DST
