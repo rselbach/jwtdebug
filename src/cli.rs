@@ -2,8 +2,6 @@ use std::ffi::OsString;
 
 use clap::{ArgAction, CommandFactory, Parser};
 
-use crate::output::Output;
-
 pub const VERSION: &str = match option_env!("JWTDEBUG_VERSION") {
     Some(version) => version,
     None => env!("CARGO_PKG_VERSION"),
@@ -16,13 +14,31 @@ pub const BUILD_DATE: &str = match option_env!("JWTDEBUG_BUILD_DATE") {
     Some(build_date) => build_date,
     None => "unknown",
 };
+const AFTER_HELP: &str = r#"If no token is provided, jwtdebug reads from stdin.
+
+Examples:
+  jwtdebug eyJhbGci...              # Decode a token
+  echo "Bearer eyJ..." | jwtdebug   # Read from pipe
+  pbpaste | jwtdebug                # Decode from the macOS clipboard
+  jwtdebug -a token                 # Show all token parts and expiration
+  jwtdebug -V -k pub.pem --algorithm RS256 token
+                                    # Verify with a trusted algorithm and key
+  jwtdebug --raw-claims token | jq  # Pipe claims to jq
+
+Exit codes:
+  0  Success
+  1  General error
+  2  Invalid token format
+  3  Signature verification failed
+
+For more information, see: https://github.com/rselbach/jwtdebug"#;
 
 #[derive(Debug, Clone, Parser)]
 #[command(
     name = "jwtdebug",
-    disable_help_flag = true,
     disable_version_flag = true,
-    about = "JWT Debug Tool - Decode and analyze JWT tokens"
+    about = "JWT Debug Tool - Decode and analyze JWT tokens",
+    after_help = AFTER_HELP
 )]
 struct Args {
     #[arg(short = 'H', long, action = ArgAction::SetTrue, help = "show token header")]
@@ -71,9 +87,6 @@ struct Args {
     #[arg(long = "version", action = ArgAction::SetTrue, help = "show version information")]
     show_version: bool,
 
-    #[arg(short = 'h', long = "help", action = ArgAction::SetTrue, help = "show help message")]
-    show_help: bool,
-
     #[arg(short = 'q', long, action = ArgAction::SetTrue, help = "suppress informational notices")]
     quiet: bool,
 
@@ -104,7 +117,6 @@ pub struct Flags {
     pub ignore_expiration: bool,
     pub verify_signature: bool,
     pub show_version: bool,
-    pub show_help: bool,
     pub quiet: bool,
     pub verbose: bool,
     pub raw_claims: bool,
@@ -145,7 +157,6 @@ where
             ignore_expiration,
             verify_signature: args.verify_signature,
             show_version: args.show_version,
-            show_help: args.show_help,
             quiet: args.quiet,
             verbose: args.verbose,
             raw_claims: args.raw_claims,
@@ -195,59 +206,6 @@ where
     }
 
     normalized
-}
-
-pub fn print_usage(output: &mut Output<'_>) {
-    output.stdout_text(
-        r#"JWT Debug Tool - Decode and analyze JWT tokens
-
-Usage: jwtdebug [options] [token]
-       jwtdebug [options] -           # read from stdin explicitly
-       command | jwtdebug [options]   # read from pipe
-
-If no token is provided, jwtdebug reads from stdin.
-
-  Display:
-    --header, -H             show token header
-    --claims, -c             show token claims (payload)
-    --signature, -s          show token signature
-    --all, -a                show all token parts and info
-    --expiration, -e         check token expiration status
-    --raw-claims             output only raw claims JSON (for piping to jq)
-
-  Verification:
-    --verify, -V             verify token signature
-    --key-file, -k <file>    key file for signature verification
-    --algorithm <algorithm>  expected signing algorithm (required for verify)
-    --ignore-expiration      ignore token expiration when verifying
-
-  Input:
-    --strict                 disable smart extraction (expect exact JWT input)
-
-  Other:
-    --help, -h               show help message
-    --version                show version information
-    --quiet, -q              suppress informational notices
-    --verbose, -v            enable verbose output for debugging
-
-Examples:
-  jwtdebug eyJhbGci...              # Decode a token
-  echo "Bearer eyJ..." | jwtdebug   # Read from pipe (strips "Bearer " prefix)
-  pbpaste | jwtdebug                # Decode token from clipboard (macOS)
-  jwtdebug -a token                 # Show all parts (header, claims, signature, expiry)
-  jwtdebug -V -k pub.pem --algorithm RS256 token
-                                      # Verify signature with public key
-  jwtdebug --raw-claims token | jq  # Pipe claims to jq
-
-Exit Codes:
-  0  Success
-  1  General error
-  2  Invalid token format
-  3  Signature verification failed
-
-For more information, see: https://github.com/rselbach/jwtdebug
-"#,
-    );
 }
 
 #[cfg(test)]
