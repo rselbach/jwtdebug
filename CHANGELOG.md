@@ -44,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   duplicate hand-maintained option list
 - Verification key files and algorithm-specific key parsers are prepared once
   per invocation and reused for every input token
+- **BREAKING**: expiration report timestamps are always rendered in UTC for
+  deterministic output across machines
 - **BREAKING**: signature verification now requires `--algorithm`, so the
   expected algorithm comes from the user rather than the untrusted token header
 - **BREAKING**: `--help` writes to stdout instead of stderr, so it can be piped
@@ -74,9 +76,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   blocking read when no writer is attached
 - Closed output pipes now terminate cleanly instead of panicking
 - Exit code now properly reflects verification failures
-- Expiration timestamps render in the UTC offset in effect at that timestamp
-  rather than the one in effect today, so dates on the other side of a DST
-  boundary no longer display an hour off
 - A future `iat` is reported as time remaining instead of a negative age
 - Rejected HMAC and RSA signatures report "signature is invalid" rather than
   jsonwebtoken's internal enum name, matching what the ES512 path already said
