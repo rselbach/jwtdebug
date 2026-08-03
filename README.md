@@ -28,8 +28,8 @@ pbpaste | jwtdebug
 # Show everything
 jwtdebug -a eyJhbGciOiJIUzI1NiIs...
 
-# Verify signature
-jwtdebug -V -k public.pem eyJhbGciOiJIUzI1NiIs...
+# Verify signature with an explicitly trusted algorithm
+jwtdebug -V -k public.pem --algorithm RS256 eyJhbGciOiJIUzI1NiIs...
 
 # Pipe claims to jq
 jwtdebug --raw-claims token | jq '.sub'
@@ -103,6 +103,7 @@ command | jwtdebug [options]   # read from pipe
 |------|-------|-------------|
 | `--verify` | `-V` | Verify token signature |
 | `--key-file` | `-k` | Key file for signature verification |
+| `--algorithm` | | Expected signing algorithm (required for verification) |
 | `--ignore-expiration` | | Ignore token expiration when verifying |
 
 ### Input Options
@@ -172,7 +173,7 @@ Token expires at 2024-05-21T03:23:42Z (2592000 seconds from now)
 ### Verify Signature
 
 ```bash
-$ jwtdebug -V -k public.pem token
+$ jwtdebug -V -k public.pem --algorithm RS256 token
 CLAIMS:
 {
   ...
