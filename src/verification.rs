@@ -7,7 +7,7 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
-use p521::ecdsa::signature::Verifier;
+use p521::ecdsa::signature::Verifier as _;
 use p521::ecdsa::{Signature, VerifyingKey};
 use p521::pkcs8::der::Decode;
 use p521::pkcs8::{DecodePublicKey, SubjectPublicKeyInfoRef};
@@ -94,55 +94,124 @@ pub struct WeakHmacKeyWarning {
     pub minimum: usize,
 }
 
-pub fn verify_token_signature(
+pub struct Verifier {
+    expected_algorithm: String,
+    method: VerificationMethod,
+    ignore_expiration: bool,
+    weak_hmac_key_warning: Option<WeakHmacKeyWarning>,
+}
+
+enum VerificationMethod {
+    JsonWebToken {
+        algorithm: Algorithm,
+        key: DecodingKey,
+        validation: Validation,
+        hmac_key_has_trailing_newline: bool,
+    },
+    Es512(VerifyingKey),
+}
+
+impl Verifier {
+    pub fn new(
+        key_file: Option<&str>,
+        expected_algorithm: Option<&str>,
+        ignore_expiration: bool,
+    ) -> Result<Self, VerificationError> {
+        let key_file = key_file
+            .filter(|key_file| !key_file.is_empty())
+            .ok_or(VerificationError::MissingKeyFile)?;
+        let expected_algorithm = expected_algorithm
+            .filter(|algorithm| !algorithm.is_empty())
+            .ok_or(VerificationError::MissingExpectedAlgorithm)?;
+        let key_data = read_key_file(key_file)?;
+
+        let (method, weak_hmac_key_warning) = if expected_algorithm == "ES512" {
+            let key_pem =
+                std::str::from_utf8(&key_data).map_err(VerificationError::KeyFileNotUtf8)?;
+            let key =
+                VerifyingKey::from_public_key_pem(key_pem).map_err(VerificationError::Es512Key)?;
+            (VerificationMethod::Es512(key), None)
+        } else {
+            let algorithm = Algorithm::from_str(expected_algorithm).map_err(|_| {
+                VerificationError::UnexpectedAlgorithm(expected_algorithm.to_string())
+            })?;
+            let (key, warning) = decoding_key(algorithm, &key_data)?;
+            let mut validation = Validation::new(algorithm);
+            validation.required_spec_claims.clear();
+            // jsonwebtoken rejects any token carrying an aud claim unless an
+            // expected audience is configured; as a debug tool we accept any
+            // audience.
+            validation.validate_aud = false;
+            // Temporal checks run through validate_time_claims so string,
+            // float, and malformed values share one fail-closed policy.
+            validation.validate_exp = false;
+            validation.validate_nbf = false;
+            (
+                VerificationMethod::JsonWebToken {
+                    algorithm,
+                    key,
+                    validation,
+                    hmac_key_has_trailing_newline: key_data.ends_with(b"\n"),
+                },
+                warning,
+            )
+        };
+
+        Ok(Self {
+            expected_algorithm: expected_algorithm.to_string(),
+            method,
+            ignore_expiration,
+            weak_hmac_key_warning,
+        })
+    }
+
+    pub fn weak_hmac_key_warning(&self) -> Option<WeakHmacKeyWarning> {
+        self.weak_hmac_key_warning
+    }
+
+    pub fn verify(&self, parsed: &ParsedToken) -> Result<(), VerificationError> {
+        let token_algorithm = parsed
+            .header
+            .get("alg")
+            .and_then(Value::as_str)
+            .ok_or_else(|| VerificationError::UnexpectedAlgorithm("<missing>".to_string()))?;
+        if token_algorithm != self.expected_algorithm {
+            return Err(VerificationError::AlgorithmMismatch {
+                expected: self.expected_algorithm.clone(),
+                actual: token_algorithm.to_string(),
+            });
+        }
+
+        match &self.method {
+            VerificationMethod::JsonWebToken {
+                algorithm,
+                key,
+                validation,
+                hmac_key_has_trailing_newline,
+            } => {
+                decode::<Value>(&parsed.raw, key, validation).map_err(|err| {
+                    hmac_newline_hint(
+                        map_jwt_error(err),
+                        *algorithm,
+                        *hmac_key_has_trailing_newline,
+                    )
+                })?;
+            }
+            VerificationMethod::Es512(key) => verify_es512(parsed, key)?,
+        }
+
+        validate_time_claims(&parsed.claims, self.ignore_expiration)
+    }
+}
+
+#[cfg(test)]
+fn verify_token_signature(
     parsed: &ParsedToken,
     key_file: Option<&str>,
     expected_algorithm: Option<&str>,
     ignore_expiration: bool,
-) -> Result<Option<WeakHmacKeyWarning>, VerificationError> {
-    let key_file = key_file
-        .filter(|key_file| !key_file.is_empty())
-        .ok_or(VerificationError::MissingKeyFile)?;
-
-    let expected_algorithm = expected_algorithm
-        .filter(|algorithm| !algorithm.is_empty())
-        .ok_or(VerificationError::MissingExpectedAlgorithm)?;
-
-    let key_data = read_key_file(key_file)?;
-    let token_algorithm = parsed
-        .header
-        .get("alg")
-        .and_then(Value::as_str)
-        .ok_or_else(|| VerificationError::UnexpectedAlgorithm("<missing>".to_string()))?;
-    if token_algorithm != expected_algorithm {
-        return Err(VerificationError::AlgorithmMismatch {
-            expected: expected_algorithm.to_string(),
-            actual: token_algorithm.to_string(),
-        });
-    }
-
-    if expected_algorithm == "ES512" {
-        return verify_es512(parsed, &key_data, ignore_expiration);
-    }
-
-    let algorithm = Algorithm::from_str(expected_algorithm)
-        .map_err(|_| VerificationError::UnexpectedAlgorithm(expected_algorithm.to_string()))?;
-    let (key, warning) = decoding_key(algorithm, &key_data)?;
-
-    let mut validation = Validation::new(algorithm);
-    validation.required_spec_claims.clear();
-    // jsonwebtoken rejects any token carrying an aud claim unless an expected
-    // audience is configured; as a debug tool we accept any audience.
-    validation.validate_aud = false;
-    // Temporal checks run through validate_time_claims so string/float/malformed
-    // exp and nbf values share one fail-closed policy with the ES512 path.
-    validation.validate_exp = false;
-    validation.validate_nbf = false;
-
-    decode::<Value>(&parsed.raw, &key, &validation)
-        .map_err(|err| hmac_newline_hint(map_jwt_error(err), algorithm, &key_data))?;
-    validate_time_claims(&parsed.claims, ignore_expiration)?;
-    Ok(warning)
+) -> Result<(), VerificationError> {
+    Verifier::new(key_file, expected_algorithm, ignore_expiration)?.verify(parsed)
 }
 
 /// Reject non-regular paths before opening, then bound the bytes read from the
@@ -192,14 +261,13 @@ fn map_jwt_error(err: jsonwebtoken::errors::Error) -> VerificationError {
 fn hmac_newline_hint(
     error: VerificationError,
     algorithm: Algorithm,
-    key_data: &[u8],
+    key_has_trailing_newline: bool,
 ) -> VerificationError {
     let is_hmac = matches!(
         algorithm,
         Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512
     );
-    if is_hmac && matches!(error, VerificationError::SignatureInvalid) && key_data.ends_with(b"\n")
-    {
+    if is_hmac && matches!(error, VerificationError::SignatureInvalid) && key_has_trailing_newline {
         return VerificationError::SignatureInvalidTrailingNewline;
     }
 
@@ -255,17 +323,12 @@ fn is_asymmetric_key(key_data: &[u8]) -> bool {
 
 fn verify_es512(
     parsed: &ParsedToken,
-    key_data: &[u8],
-    ignore_expiration: bool,
-) -> Result<Option<WeakHmacKeyWarning>, VerificationError> {
+    verifying_key: &VerifyingKey,
+) -> Result<(), VerificationError> {
     let signature = URL_SAFE_NO_PAD
         .decode(&parsed.signature)
         .map_err(VerificationError::DecodeSignature)?;
     let signature = Signature::from_slice(&signature).map_err(VerificationError::Es512Signature)?;
-    let key_pem = std::str::from_utf8(key_data).map_err(VerificationError::KeyFileNotUtf8)?;
-    let verifying_key =
-        VerifyingKey::from_public_key_pem(key_pem).map_err(VerificationError::Es512Key)?;
-
     let signing_input = parsed
         .raw
         .rsplit_once('.')
@@ -275,9 +338,7 @@ fn verify_es512(
         .verify(signing_input.as_bytes(), &signature)
         .map_err(|_| VerificationError::SignatureInvalid)?;
 
-    validate_time_claims(&parsed.claims, ignore_expiration)?;
-
-    Ok(None)
+    Ok(())
 }
 
 fn validate_time_claims(

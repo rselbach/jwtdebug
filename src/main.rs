@@ -11,6 +11,8 @@ use std::io::{self, BufRead, IsTerminal, Write};
 
 use constants::{EXIT_ERROR, EXIT_INVALID_TOKEN, EXIT_SUCCESS, EXIT_VERIFICATION_FAIL};
 
+type VerifierState = Option<Result<verification::Verifier, String>>;
+
 fn main() {
     let stdout = io::stdout();
     let stderr = io::stderr();
@@ -85,13 +87,17 @@ fn process_input_tokens(
     args: &[String],
     output: &mut output::Output<'_>,
 ) -> i32 {
+    let mut verifier = None;
     match args {
-        [] => process_from_stdin(flags, false, output),
-        [arg] if arg == "-" => process_from_stdin(flags, true, output),
+        [] => process_from_stdin(flags, false, &mut verifier, output),
+        [arg] if arg == "-" => process_from_stdin(flags, true, &mut verifier, output),
         _ => {
             let mut exit_code = EXIT_SUCCESS;
             for token in args {
-                exit_code = retain_first_failure(exit_code, process_token(token, flags, output));
+                exit_code = retain_first_failure(
+                    exit_code,
+                    process_token(token, flags, &mut verifier, output),
+                );
             }
             exit_code
         }
@@ -109,7 +115,12 @@ fn retain_first_failure(seen: i32, current: i32) -> i32 {
     }
 }
 
-fn process_token(input: &str, flags: &cli::Flags, output: &mut output::Output<'_>) -> i32 {
+fn process_token(
+    input: &str,
+    flags: &cli::Flags,
+    verifier: &mut VerifierState,
+    output: &mut output::Output<'_>,
+) -> i32 {
     let parsed = match parser::resolve_token(input, flags.strict) {
         Ok(parsed) => parsed,
         Err(err) => {
@@ -130,21 +141,31 @@ fn process_token(input: &str, flags: &cli::Flags, output: &mut output::Output<'_
             ),
             output,
         );
-        let verification = verification::verify_token_signature(
-            &parsed,
-            flags.key_file.as_deref(),
-            flags.algorithm.as_deref(),
-            flags.ignore_expiration,
-        );
-        match verification {
-            Ok(Some(warning)) => {
-                printer::print_weak_hmac_key_warning(warning.actual, warning.minimum, output);
+        if verifier.is_none() {
+            let initialized = verification::Verifier::new(
+                flags.key_file.as_deref(),
+                flags.algorithm.as_deref(),
+                flags.ignore_expiration,
+            )
+            .map_err(|err| err.to_string());
+            if let Ok(verifier) = &initialized {
+                if let Some(warning) = verifier.weak_hmac_key_warning() {
+                    printer::print_weak_hmac_key_warning(warning.actual, warning.minimum, output);
+                }
             }
-            Ok(None) => {}
-            Err(err) => {
-                printer::print_verification_failure(&err, output);
+            *verifier = Some(initialized);
+        }
+
+        let verifier = match verifier.as_ref().expect("verifier state was initialized") {
+            Ok(verifier) => verifier,
+            Err(message) => {
+                printer::print_verification_failure(message, output);
                 return EXIT_VERIFICATION_FAIL;
             }
+        };
+        if let Err(err) = verifier.verify(&parsed) {
+            printer::print_verification_failure(&err, output);
+            return EXIT_VERIFICATION_FAIL;
         }
         log_verbose(flags, "signature verification succeeded", output);
     }
@@ -232,7 +253,12 @@ fn log_verbose(flags: &cli::Flags, message: impl AsRef<str>, output: &mut output
     }
 }
 
-fn process_from_stdin(flags: &cli::Flags, explicit: bool, output: &mut output::Output<'_>) -> i32 {
+fn process_from_stdin(
+    flags: &cli::Flags,
+    explicit: bool,
+    verifier: &mut VerifierState,
+    output: &mut output::Output<'_>,
+) -> i32 {
     let stdin = io::stdin();
     if stdin.is_terminal() {
         if !explicit {
@@ -264,7 +290,7 @@ fn process_from_stdin(flags: &cli::Flags, explicit: bool, output: &mut output::O
         }
 
         has_token = true;
-        exit_code = retain_first_failure(exit_code, process_token(line, flags, output));
+        exit_code = retain_first_failure(exit_code, process_token(line, flags, verifier, output));
     }
 
     if !has_token {

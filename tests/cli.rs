@@ -5,6 +5,9 @@ use assert_cmd::Command;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use base64::Engine;
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+use p521::ecdsa::SigningKey;
+use p521::elliptic_curve::Generate;
+use p521::pkcs8::{EncodePublicKey, LineEnding};
 use predicates::prelude::*;
 use serde_json::json;
 use tempfile::NamedTempFile;
@@ -944,12 +947,12 @@ fn der_encoded_public_keys_cannot_be_used_as_hmac_secrets() {
 }
 
 #[test]
-fn short_hmac_key_warns_but_still_verifies() {
+fn short_hmac_key_warns_once_and_verifies_multiple_tokens() {
     let secret = b"too-short";
     let token = hmac_token(secret, json!({ "sub": "Short HMAC Key" }));
     let key_file = key_file(secret);
 
-    Command::cargo_bin("jwtdebug")
+    let output = Command::cargo_bin("jwtdebug")
         .expect("binary exists")
         .args([
             "--verify",
@@ -958,11 +961,16 @@ fn short_hmac_key_warns_but_still_verifies() {
             "--key-file",
             key_file.path().to_str().expect("utf-8 path"),
             &token,
+            &token,
         ])
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("Warning: HMAC key is 9 bytes"))
-        .stdout(predicate::str::contains("Signature verified successfully"));
+        .output()
+        .expect("run jwtdebug");
+
+    assert!(output.status.success(), "jwtdebug failed: {output:?}");
+    let stderr = String::from_utf8(output.stderr).expect("UTF-8 stderr");
+    assert_eq!(1, stderr.matches("Warning: HMAC key is 9 bytes").count());
+    let stdout = String::from_utf8(output.stdout).expect("UTF-8 stdout");
+    assert_eq!(2, stdout.matches("Signature verified successfully").count());
 }
 
 #[test]
@@ -1312,7 +1320,12 @@ fn es512_malformed_signature_reports_signature_error() {
         json!({ "alg": "ES512", "typ": "JWT" }),
         json!({ "sub": "ES512 Signature Parser" }),
     );
-    let key_file = key_file(b"not-a-valid-public-key-but-long-enough");
+    let signing_key = SigningKey::generate();
+    let public_key = signing_key
+        .verifying_key()
+        .to_public_key_pem(LineEnding::LF)
+        .expect("encode public key");
+    let key_file = key_file(public_key.as_bytes());
 
     Command::cargo_bin("jwtdebug")
         .expect("binary exists")
