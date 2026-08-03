@@ -571,6 +571,27 @@ fn wrong_hmac_secret_reports_an_invalid_signature() {
 }
 
 #[test]
+fn trailing_newline_in_hmac_key_file_is_named_in_the_error() {
+    let secret = b"test-secret-key-at-least-32-bytes-long!";
+    let token = hmac_token(secret, json!({ "sub": "Ben Chang" }));
+    let mut written_with_echo = secret.to_vec();
+    written_with_echo.push(b'\n');
+    let key_file = key_file(&written_with_echo);
+
+    Command::cargo_bin("jwtdebug")
+        .expect("binary exists")
+        .args([
+            "--verify",
+            "--key-file",
+            key_file.path().to_str().expect("utf-8 path"),
+            &token,
+        ])
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains("key file ends with a newline"));
+}
+
+#[test]
 fn pem_backed_algorithms_verify_successfully() {
     for (algorithm, private_key, public_key, subject) in [
         (Algorithm::RS256, RSA_PRIVATE_KEY, RSA_PUBLIC_KEY, "RS256"),

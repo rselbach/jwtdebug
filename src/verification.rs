@@ -65,6 +65,11 @@ pub enum VerificationError {
     #[error("signature is invalid")]
     SignatureInvalid,
 
+    #[error(
+        "signature is invalid (key file ends with a newline; if that is not part of the secret, write it with `printf %s` or `echo -n`)"
+    )]
+    SignatureInvalidTrailingNewline,
+
     #[error("token is expired")]
     TokenExpired,
 
@@ -119,7 +124,8 @@ pub fn verify_token_signature(
     validation.validate_exp = false;
     validation.validate_nbf = false;
 
-    decode::<Value>(&parsed.raw, &key, &validation).map_err(map_jwt_error)?;
+    decode::<Value>(&parsed.raw, &key, &validation)
+        .map_err(|err| hmac_newline_hint(map_jwt_error(err), algorithm, &key_data))?;
     if !ignore_expiration {
         validate_time_claims(&parsed.claims)?;
     }
@@ -133,6 +139,26 @@ fn map_jwt_error(err: jsonwebtoken::errors::Error) -> VerificationError {
         ErrorKind::InvalidSignature => VerificationError::SignatureInvalid,
         _ => VerificationError::Jwt(err),
     }
+}
+
+/// An HMAC secret is raw file bytes, so a key file written with `echo` carries
+/// a trailing newline that silently changes the secret. Say so when the
+/// signature is what failed, rather than leaving the user to guess.
+fn hmac_newline_hint(
+    error: VerificationError,
+    algorithm: Algorithm,
+    key_data: &[u8],
+) -> VerificationError {
+    let is_hmac = matches!(
+        algorithm,
+        Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512
+    );
+    if is_hmac && matches!(error, VerificationError::SignatureInvalid) && key_data.ends_with(b"\n")
+    {
+        return VerificationError::SignatureInvalidTrailingNewline;
+    }
+
+    error
 }
 
 fn decoding_key(algorithm: Algorithm, key_data: &[u8]) -> Result<DecodingKey, VerificationError> {
