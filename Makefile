@@ -32,7 +32,7 @@ clean:
 test:
 	@echo "Running Rust tests..."
 	@cargo fmt --check
-	@cargo clippy -- -D warnings
+	@cargo clippy --all-targets -- -D warnings
 	@cargo test
 
 install:
