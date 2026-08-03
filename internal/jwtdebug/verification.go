@@ -51,12 +51,11 @@ type weakHMACKeyWarning struct {
 }
 
 type verifier struct {
-	expectedAlgorithm string
-	algorithm         signingAlgorithm
-	key               any
-	ignoreExpiration  bool
-	trailingNewline   bool
-	weakKeyWarning    *weakHMACKeyWarning
+	algorithm        signingAlgorithm
+	key              any
+	ignoreExpiration bool
+	trailingNewline  bool
+	weakKeyWarning   *weakHMACKeyWarning
 }
 
 func newVerifier(keyFile, expectedAlgorithm string, ignoreExpiration bool) (*verifier, error) {
@@ -81,32 +80,31 @@ func newVerifier(keyFile, expectedAlgorithm string, ignoreExpiration bool) (*ver
 	}
 
 	return &verifier{
-		expectedAlgorithm: expectedAlgorithm,
-		algorithm:         algorithm,
-		key:               key,
-		ignoreExpiration:  ignoreExpiration,
-		trailingNewline:   bytes.HasSuffix(keyData, []byte("\n")),
-		weakKeyWarning:    warning,
+		algorithm:        algorithm,
+		key:              key,
+		ignoreExpiration: ignoreExpiration,
+		trailingNewline:  bytes.HasSuffix(keyData, []byte("\n")),
+		weakKeyWarning:   warning,
 	}, nil
 }
 
-func lookupAlgorithm(name string) (signingAlgorithm, error) {
-	algorithms := map[string]signingAlgorithm{
-		"HS256": {name: "HS256", family: hmacAlgorithm, hash: crypto.SHA256, newHash: sha256.New, minimumKeySize: 32},
-		"HS384": {name: "HS384", family: hmacAlgorithm, hash: crypto.SHA384, newHash: sha512.New384, minimumKeySize: 48},
-		"HS512": {name: "HS512", family: hmacAlgorithm, hash: crypto.SHA512, newHash: sha512.New, minimumKeySize: 64},
-		"RS256": {name: "RS256", family: rsaAlgorithm, hash: crypto.SHA256, newHash: sha256.New},
-		"RS384": {name: "RS384", family: rsaAlgorithm, hash: crypto.SHA384, newHash: sha512.New384},
-		"RS512": {name: "RS512", family: rsaAlgorithm, hash: crypto.SHA512, newHash: sha512.New},
-		"PS256": {name: "PS256", family: rsaPSSAlgorithm, hash: crypto.SHA256, newHash: sha256.New},
-		"PS384": {name: "PS384", family: rsaPSSAlgorithm, hash: crypto.SHA384, newHash: sha512.New384},
-		"PS512": {name: "PS512", family: rsaPSSAlgorithm, hash: crypto.SHA512, newHash: sha512.New},
-		"ES256": {name: "ES256", family: ecdsaAlgorithm, hash: crypto.SHA256, newHash: sha256.New, ecdsaSignatureSize: 64},
-		"ES384": {name: "ES384", family: ecdsaAlgorithm, hash: crypto.SHA384, newHash: sha512.New384, ecdsaSignatureSize: 96},
-		"ES512": {name: "ES512", family: ecdsaAlgorithm, hash: crypto.SHA512, newHash: sha512.New, ecdsaSignatureSize: 132},
-		"EdDSA": {name: "EdDSA", family: edDSAAlgorithm},
-	}
+var algorithms = map[string]signingAlgorithm{
+	"HS256": {name: "HS256", family: hmacAlgorithm, hash: crypto.SHA256, newHash: sha256.New, minimumKeySize: 32},
+	"HS384": {name: "HS384", family: hmacAlgorithm, hash: crypto.SHA384, newHash: sha512.New384, minimumKeySize: 48},
+	"HS512": {name: "HS512", family: hmacAlgorithm, hash: crypto.SHA512, newHash: sha512.New, minimumKeySize: 64},
+	"RS256": {name: "RS256", family: rsaAlgorithm, hash: crypto.SHA256, newHash: sha256.New},
+	"RS384": {name: "RS384", family: rsaAlgorithm, hash: crypto.SHA384, newHash: sha512.New384},
+	"RS512": {name: "RS512", family: rsaAlgorithm, hash: crypto.SHA512, newHash: sha512.New},
+	"PS256": {name: "PS256", family: rsaPSSAlgorithm, hash: crypto.SHA256, newHash: sha256.New},
+	"PS384": {name: "PS384", family: rsaPSSAlgorithm, hash: crypto.SHA384, newHash: sha512.New384},
+	"PS512": {name: "PS512", family: rsaPSSAlgorithm, hash: crypto.SHA512, newHash: sha512.New},
+	"ES256": {name: "ES256", family: ecdsaAlgorithm, hash: crypto.SHA256, newHash: sha256.New, ecdsaSignatureSize: 64},
+	"ES384": {name: "ES384", family: ecdsaAlgorithm, hash: crypto.SHA384, newHash: sha512.New384, ecdsaSignatureSize: 96},
+	"ES512": {name: "ES512", family: ecdsaAlgorithm, hash: crypto.SHA512, newHash: sha512.New, ecdsaSignatureSize: 132},
+	"EdDSA": {name: "EdDSA", family: edDSAAlgorithm},
+}
 
+func lookupAlgorithm(name string) (signingAlgorithm, error) {
 	algorithm, ok := algorithms[name]
 	if !ok {
 		return signingAlgorithm{}, fmt.Errorf("unexpected signing method: %s", name)
@@ -182,9 +180,12 @@ func prepareVerificationKey(
 }
 
 func parsePublicKeyPEM(data []byte) (any, error) {
-	block, _ := pem.Decode(data)
+	block, rest := pem.Decode(data)
 	if block == nil {
 		return nil, errors.New("invalid PEM data")
+	}
+	if len(bytes.TrimSpace(rest)) != 0 {
+		return nil, errors.New("public key PEM contains multiple blocks or trailing data")
 	}
 	if key, err := x509.ParsePKIXPublicKey(block.Bytes); err == nil {
 		return key, nil
@@ -271,11 +272,11 @@ func (v *verifier) verify(token parsedToken, now time.Time) error {
 	if !ok {
 		return errors.New("unexpected signing method: <missing>")
 	}
-	if actualAlgorithm != v.expectedAlgorithm {
+	if actualAlgorithm != v.algorithm.name {
 		return fmt.Errorf(
 			"token signing algorithm %s does not match expected algorithm %s",
 			actualAlgorithm,
-			v.expectedAlgorithm,
+			v.algorithm.name,
 		)
 	}
 	if err := validateProtectedHeader(token.header); err != nil {

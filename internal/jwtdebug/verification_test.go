@@ -168,6 +168,26 @@ func TestOversizedKeyFileIsRejected(t *testing.T) {
 	}
 }
 
+func TestPublicKeyPEMRejectsAdditionalData(t *testing.T) {
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate EC key: %v", err)
+	}
+	key := publicKeyPEM(t, &privateKey.PublicKey)
+
+	for name, data := range map[string][]byte{
+		"trailing data":   append(append([]byte(nil), key...), []byte("unexpected")...),
+		"multiple blocks": append(append([]byte(nil), key...), key...),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := parsePublicKeyPEM(data); err == nil ||
+				!strings.Contains(err.Error(), "multiple blocks or trailing data") {
+				t.Fatalf("error = %v", err)
+			}
+		})
+	}
+}
+
 func TestAsymmetricKeysCannotBeHMACSecrets(t *testing.T) {
 	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
