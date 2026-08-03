@@ -42,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Rust 1.88 minimum; the redundant build-only job was removed
 - Help output is generated from the Clap argument definitions, eliminating the
   duplicate hand-maintained option list
+- Verification key files and algorithm-specific key parsers are prepared once
+  per invocation and reused for every input token
 - **BREAKING**: signature verification now requires `--algorithm`, so the
   expected algorithm comes from the user rather than the untrusted token header
 - **BREAKING**: `--help` writes to stdout instead of stderr, so it can be piped

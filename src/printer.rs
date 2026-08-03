@@ -34,7 +34,7 @@ pub fn print_verification_success(output: &mut Output<'_>) {
     output.stdout_line(format_args!("Signature verified successfully"));
 }
 
-pub fn print_verification_failure(err: &dyn std::error::Error, output: &mut Output<'_>) {
+pub fn print_verification_failure(err: impl std::fmt::Display, output: &mut Output<'_>) {
     output.stderr_line(format_args!("Signature verification failed: {err}"));
 }
 
