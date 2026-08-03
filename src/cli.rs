@@ -196,36 +196,36 @@ where
 }
 
 pub fn print_usage() {
-    eprintln!("JWT Debug Tool - Decode and analyze JWT tokens");
-    eprintln!();
-    eprintln!("Usage: jwtdebug [options] [token]");
-    eprintln!("       jwtdebug [options] -           # read from stdin explicitly");
-    eprintln!("       command | jwtdebug [options]   # read from pipe");
-    eprintln!();
-    eprintln!("If no token is provided, jwtdebug reads from stdin.");
-    eprintln!();
-    eprintln!("  Display:");
-    eprintln!("    --header, -H             show token header");
-    eprintln!("    --claims, -c             show token claims (payload)");
-    eprintln!("    --signature, -s          show token signature");
-    eprintln!("    --all, -a                show all token parts and info");
-    eprintln!("    --expiration, -e         check token expiration status");
-    eprintln!("    --raw-claims             output only raw claims JSON (for piping to jq)");
-    eprintln!();
-    eprintln!("  Verification:");
-    eprintln!("    --verify, -V             verify token signature (requires --key-file)");
-    eprintln!("    --key-file, -k <file>    key file for signature verification");
-    eprintln!("    --ignore-expiration      ignore token expiration when verifying");
-    eprintln!();
-    eprintln!("  Input:");
-    eprintln!("    --strict                 disable smart extraction (expect exact JWT input)");
-    eprintln!();
-    eprintln!("  Other:");
-    eprintln!("    --help, -h               show help message");
-    eprintln!("    --version                show version information");
-    eprintln!("    --quiet, -q              suppress informational notices");
-    eprintln!("    --verbose, -v            enable verbose output for debugging");
-    eprintln!(
+    println!("JWT Debug Tool - Decode and analyze JWT tokens");
+    println!();
+    println!("Usage: jwtdebug [options] [token]");
+    println!("       jwtdebug [options] -           # read from stdin explicitly");
+    println!("       command | jwtdebug [options]   # read from pipe");
+    println!();
+    println!("If no token is provided, jwtdebug reads from stdin.");
+    println!();
+    println!("  Display:");
+    println!("    --header, -H             show token header");
+    println!("    --claims, -c             show token claims (payload)");
+    println!("    --signature, -s          show token signature");
+    println!("    --all, -a                show all token parts and info");
+    println!("    --expiration, -e         check token expiration status");
+    println!("    --raw-claims             output only raw claims JSON (for piping to jq)");
+    println!();
+    println!("  Verification:");
+    println!("    --verify, -V             verify token signature (requires --key-file)");
+    println!("    --key-file, -k <file>    key file for signature verification");
+    println!("    --ignore-expiration      ignore token expiration when verifying");
+    println!();
+    println!("  Input:");
+    println!("    --strict                 disable smart extraction (expect exact JWT input)");
+    println!();
+    println!("  Other:");
+    println!("    --help, -h               show help message");
+    println!("    --version                show version information");
+    println!("    --quiet, -q              suppress informational notices");
+    println!("    --verbose, -v            enable verbose output for debugging");
+    println!(
         r#"
 Examples:
   jwtdebug eyJhbGci...              # Decode a token

@@ -381,18 +381,18 @@ fn empty_piped_stdin_is_general_error() {
 }
 
 #[test]
-fn help_matches_go_style_stderr() {
+fn help_goes_to_stdout() {
     Command::cargo_bin("jwtdebug")
         .expect("binary exists")
         .arg("--help")
         .assert()
         .success()
-        .stdout("")
-        .stderr(predicate::str::contains(
+        .stderr("")
+        .stdout(predicate::str::contains(
             "Usage: jwtdebug [options] [token]",
         ))
-        .stderr(predicate::str::contains("Display:"))
-        .stderr(predicate::str::contains("Exit Codes:"));
+        .stdout(predicate::str::contains("Display:"))
+        .stdout(predicate::str::contains("Exit Codes:"));
 }
 
 #[test]
