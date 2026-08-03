@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Removed the nonfunctional AppImage release hook and its unverified rolling
+  tool download; supported Linux archives and packages are unchanged
 - **BREAKING**: signature verification now requires `--algorithm`, so the
   expected algorithm comes from the user rather than the untrusted token header
 - **BREAKING**: `--help` writes to stdout instead of stderr, so it can be piped

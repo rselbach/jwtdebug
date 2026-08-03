@@ -20,9 +20,6 @@ builds:
     targets:
       - x86_64-unknown-linux-gnu
       - aarch64-unknown-linux-gnu
-    hooks:
-      post:
-        - cmd: ./scripts/build-appimage.sh "{{ .Path }}" "{{ .ProjectName }}" "{{ .Version }}"
 
   - id: default
     builder: rust
