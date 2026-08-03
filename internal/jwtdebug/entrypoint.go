@@ -49,6 +49,10 @@ func isOnlyBrokenPipe(err error) bool {
 		}
 		return true
 	}
+	if wrapped, ok := err.(interface{ Unwrap() error }); ok {
+		child := wrapped.Unwrap()
+		return child != nil && isOnlyBrokenPipe(child)
+	}
 	return isBrokenPipe(err)
 }
 

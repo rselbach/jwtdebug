@@ -3,6 +3,7 @@ package jwtdebug
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -369,6 +370,17 @@ func TestBrokenPipeExitsSuccessfully(t *testing.T) {
 	}
 	if got := finalExitCode(exitCode, err); got != exitSuccess {
 		t.Fatalf("final exit code = %d", got)
+	}
+}
+
+func TestWrappedMixedOutputErrorsDoNotExitSuccessfully(t *testing.T) {
+	writeErr := errors.New("write failed")
+	mixed := fmt.Errorf("wrapped output error: %w", errors.Join(io.ErrClosedPipe, writeErr))
+	if isOnlyBrokenPipe(mixed) {
+		t.Fatalf("mixed output error classified as only broken pipes: %v", mixed)
+	}
+	if got := finalExitCode(exitSuccess, mixed); got != exitError {
+		t.Fatalf("final exit code = %d, want %d", got, exitError)
 	}
 }
 
