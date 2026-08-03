@@ -81,8 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A future `iat` is reported as time remaining instead of a negative age
 - Rejected HMAC and RSA signatures report "signature is invalid" rather than
   jsonwebtoken's internal enum name, matching what the ES512 path already said
-- DER-encoded public keys are rejected as HMAC secrets, closing a gap in the
-  algorithm-confusion guard that only checked for PEM
+- DER-encoded SubjectPublicKeyInfo keys are rejected as HMAC secrets, closing a
+  gap in the algorithm-confusion guard that only checked for PEM
 - Fractional NumericDate strings such as `"exp": "1700000000.5"` are accepted,
   matching the existing handling of fractional numbers
 
