@@ -9,8 +9,6 @@ import (
 	"strings"
 )
 
-const sourceVersion = "1.3.1"
-
 var (
 	version   string
 	commit    = "unknown"
@@ -61,7 +59,7 @@ func resolvedVersion() string {
 	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
 		return strings.TrimPrefix(info.Main.Version, "v")
 	}
-	return sourceVersion
+	return "devel"
 }
 
 func finalExitCode(exitCode int, outputErr error) int {

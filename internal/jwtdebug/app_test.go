@@ -313,6 +313,21 @@ func TestCLIHelpAndVersion(t *testing.T) {
 	}
 }
 
+func TestResolvedVersionUsesInjectedValueOrDevelopmentFallback(t *testing.T) {
+	originalVersion := version
+	t.Cleanup(func() { version = originalVersion })
+
+	version = "v2.3.4"
+	if got := resolvedVersion(); got != "2.3.4" {
+		t.Fatalf("injected version = %q", got)
+	}
+
+	version = ""
+	if got := resolvedVersion(); got != "devel" {
+		t.Fatalf("development version = %q", got)
+	}
+}
+
 func TestCLIDeprecatedFlagsWarn(t *testing.T) {
 	token := unsignedJWT(t, map[string]any{"sub": "Greendale Human Being"})
 	result := runCLI(t, []string{"-expiry", "-ignore-exp", "--quiet", token}, "")

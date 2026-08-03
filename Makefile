@@ -15,7 +15,9 @@ VERSION := $(shell \
 	    || git rev-parse --short HEAD; \
 	fi)
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+# Use the commit timestamp by default so repeated builds of the same revision
+# carry identical metadata. Callers can override BUILD_DATE when needed.
+BUILD_DATE ?= $(shell git show -s --format=%cI HEAD 2>/dev/null || echo "unknown")
 LDFLAGS := -X $(VERSION_PACKAGE).version=$(VERSION) \
 	-X $(VERSION_PACKAGE).commit=$(COMMIT) \
 	-X $(VERSION_PACKAGE).buildDate=$(BUILD_DATE)
