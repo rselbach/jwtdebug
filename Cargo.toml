@@ -16,7 +16,7 @@ p521 = "0.14.0"
 regex = "1.12.2"
 serde_json = { version = "1.0.145", features = ["preserve_order"] }
 thiserror = "2.0.17"
-time = { version = "0.3.44", features = ["formatting", "local-offset", "parsing"] }
+time = { version = "0.3.44", features = ["formatting", "parsing"] }
 
 [dev-dependencies]
 assert_cmd = "2.0.17"

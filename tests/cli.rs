@@ -291,32 +291,6 @@ fn expiration_report_handles_minimum_timestamp() {
         .stdout(predicate::str::contains("Issued at: -9223372036854775808"));
 }
 
-#[cfg(unix)]
-#[test]
-fn expiration_report_handles_timezone_shifted_boundary_timestamps() {
-    // These timestamps are in range as UTC instants, but shifting them into a
-    // non-UTC local offset moves them past the supported year range.
-    for (timezone, timestamp) in [
-        ("Etc/GMT-14", 253_402_300_799_i64),
-        ("Etc/GMT+12", -377_705_116_800),
-    ] {
-        let token = unsigned_token(json!({
-            "sub": "Ben Chang",
-            "exp": timestamp,
-            "nbf": timestamp,
-            "iat": timestamp,
-        }));
-
-        Command::cargo_bin("jwtdebug")
-            .expect("binary exists")
-            .env("TZ", timezone)
-            .args(["--expiration", "--claims=false", "--quiet", &token])
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Issued at:"));
-    }
-}
-
 #[test]
 fn expiration_report_states_future_iat_as_time_remaining() {
     let token = unsigned_token(json!({ "sub": "Craig Pelton", "iat": 4_102_444_800_u64 }));
@@ -331,20 +305,16 @@ fn expiration_report_states_future_iat_as_time_remaining() {
         .stdout(predicate::str::contains("seconds ago").not());
 }
 
-#[cfg(unix)]
 #[test]
-fn expiration_report_uses_the_offset_in_effect_at_each_timestamp() {
-    // One winter and one summer instant in a DST-observing zone: no single
-    // fixed offset renders both correctly, whatever today's date happens to be.
+fn expiration_report_uses_utc() {
     for (timestamp, want) in [
-        (1_700_000_000_i64, "2023-11-14T17:13:20-05:00"),
-        (1_690_000_000, "2023-07-22T00:26:40-04:00"),
+        (1_700_000_000_i64, "2023-11-14T22:13:20Z"),
+        (1_690_000_000, "2023-07-22T04:26:40Z"),
     ] {
         let token = unsigned_token(json!({ "sub": "Jeff Winger", "iat": timestamp }));
 
         Command::cargo_bin("jwtdebug")
             .expect("binary exists")
-            .env("TZ", "America/New_York")
             .args(["--expiration", "--claims=false", "--quiet", &token])
             .assert()
             .success()
