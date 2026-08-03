@@ -785,6 +785,34 @@ fn directory_key_file_exits_3() {
         .stderr(predicate::str::contains("key file must be a regular file"));
 }
 
+#[cfg(unix)]
+#[test]
+fn fifo_key_file_is_rejected_without_blocking() {
+    let token = unsigned_token(json!({ "sub": "Greendale Intercom" }));
+    let directory = tempfile::tempdir().expect("create temporary directory");
+    let fifo = directory.path().join("key.fifo");
+    let status = std::process::Command::new("mkfifo")
+        .arg(&fifo)
+        .status()
+        .expect("run mkfifo");
+    assert!(status.success(), "mkfifo failed with {status}");
+
+    let mut command = Command::cargo_bin("jwtdebug").expect("binary exists");
+    command
+        .timeout(std::time::Duration::from_secs(2))
+        .args([
+            "--verify",
+            "--algorithm",
+            "HS256",
+            "--key-file",
+            fifo.to_str().expect("utf-8 path"),
+            &token,
+        ])
+        .assert()
+        .code(3)
+        .stderr(predicate::str::contains("key file must be a regular file"));
+}
+
 #[test]
 fn oversized_key_file_exits_3() {
     let token = unsigned_token(json!({ "sub": "Oversized Key File" }));

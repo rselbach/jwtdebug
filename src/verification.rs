@@ -140,10 +140,19 @@ pub fn verify_token_signature(
     Ok(())
 }
 
-/// Read a key file through a single handle, so the size limit governs the
-/// bytes actually used rather than a stat that could go stale before the read.
+/// Reject non-regular paths before opening, then bound the bytes read from the
+/// opened handle so a stale size from metadata cannot bypass the limit.
 fn read_key_file(path: &str) -> Result<Vec<u8>, VerificationError> {
+    if !std::fs::metadata(path)
+        .map_err(VerificationError::OpenKeyFile)?
+        .is_file()
+    {
+        return Err(VerificationError::KeyFileNotRegular);
+    }
+
     let file = File::open(path).map_err(VerificationError::OpenKeyFile)?;
+    // Check the opened handle too in case the path changed after the preflight
+    // check. The preflight is what prevents a normal FIFO open from blocking.
     if !file
         .metadata()
         .map_err(VerificationError::OpenKeyFile)?
