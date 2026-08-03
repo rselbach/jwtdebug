@@ -1,6 +1,6 @@
 use std::ffi::OsString;
 
-use clap::{ArgAction, Parser};
+use clap::{ArgAction, CommandFactory, Parser};
 
 pub const VERSION: &str = match option_env!("JWTDEBUG_VERSION") {
     Some(version) => version,
@@ -148,25 +148,13 @@ where
     T: Into<OsString> + Clone,
 {
     let mut normalized = vec![OsString::from("jwtdebug")];
-    let long_flags = [
-        "all",
-        "header",
-        "claims",
-        "signature",
-        "expiration",
-        "raw-claims",
-        "verify",
-        "key-file",
-        "ignore-expiration",
-        "strict",
-        "help",
-        "version",
-        "quiet",
-        "verbose",
-        "key",
-        "expiry",
-        "ignore-exp",
-    ];
+    // Take the accepted names from the parser itself, so adding a flag makes
+    // it work in both -flag and --flag form without a second list to update.
+    let command = Args::command();
+    let long_flags: Vec<&str> = command
+        .get_arguments()
+        .filter_map(clap::Arg::get_long)
+        .collect();
 
     for arg in args {
         let arg = arg.into();
