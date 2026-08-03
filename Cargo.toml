@@ -8,9 +8,9 @@ description = "A fast, modern command-line utility for decoding and debugging JS
 repository = "https://github.com/rselbach/jwtdebug"
 
 [dependencies]
-base64 = "0.22.1"
+base64 = "0.23.0"
 clap = { version = "4.5.51", features = ["derive"] }
-jsonwebtoken = "9.3.1"
+jsonwebtoken = "11.0.0"
 # jsonwebtoken has no ES512 support, so P-521 verification uses RustCrypto.
 p521 = "0.14.0"
 regex = "1.12.2"
