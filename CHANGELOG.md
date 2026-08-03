@@ -25,8 +25,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Message when reading from stdin interactively
 - **Version output**: Now includes commit hash and build date with `--verbose`
 - **Exit codes**: Documented and consistent exit codes (0=success, 1=error, 2=invalid token, 3=verification failed)
+- Verification errors name a trailing newline in an HMAC key file, a common
+  result of writing the secret with `echo` rather than `echo -n`
 
 ### Changed
+
+- **BREAKING**: `--help` writes to stdout instead of stderr, so it can be piped
+  to a pager or `grep`
+- **BREAKING**: every input token is processed even when an earlier one fails,
+  for both command-line arguments and piped stdin. The exit code reports the
+  first failure rather than stopping at it
+- A short HMAC key warns instead of failing verification, so tokens signed with
+  common sample secrets (jwt.io's default is 19 bytes) can be inspected. The
+  warning is not silenced by `--quiet`
+- Key file failures report a single "failed to open key file" message instead of
+  splitting into separate stat and read wording
 
 - Renamed flags for consistency with common CLI tools:
   - `-sig` → `--signature`/`-s`
@@ -38,6 +51,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Exit code now properly reflects verification failures
+- Expiration timestamps render in the UTC offset in effect at that timestamp
+  rather than the one in effect today, so dates on the other side of a DST
+  boundary no longer display an hour off
+- A future `iat` is reported as time remaining instead of a negative age
+- Rejected HMAC and RSA signatures report "signature is invalid" rather than
+  jsonwebtoken's internal enum name, matching what the ES512 path already said
+- DER-encoded public keys are rejected as HMAC secrets, closing a gap in the
+  algorithm-confusion guard that only checked for PEM
+- Fractional NumericDate strings such as `"exp": "1700000000.5"` are accepted,
+  matching the existing handling of fractional numbers
 
 ## [0.1.0] - Initial Release
 
