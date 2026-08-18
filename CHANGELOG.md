@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-18
+
+### Changed
+
+- Rewrote the CLI in idiomatic Rust 2024 while preserving its command-line,
+  output, exit-code, exact numeric-date, and signature-verification behavior
+- Migrated builds, CI, dependency updates, and cross-platform releases to the
+  pinned Rust and Cargo toolchain
+
+### Security
+
+- Kept verification policy explicit across all 13 supported algorithms,
+  including algorithm pinning, strict JOSE protected-header handling, bounded
+  inputs, RSA key-size enforcement, and asymmetric-key/HMAC confusion defenses
+
+## [1.4.0] - 2026-08-03
+
 ### Added
 
 - **Smart token extraction** (enabled by default):
