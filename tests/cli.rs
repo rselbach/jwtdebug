@@ -258,6 +258,32 @@ fn verification_configuration_errors_exit_three() {
     );
 }
 
+#[test]
+fn diagnostics_escape_terminal_control_sequences() {
+    let unsafe_text = "\u{1b}]0;Greendale\u{7}";
+    let invalid = execute(&[&format!("{unsafe_text}-invalid")], "");
+    assert_eq!(invalid.code, 2);
+    assert!(invalid.stderr.contains(r"\u{1b}]0;Greendale\u{7}"));
+    assert!(!invalid.stderr.contains(['\u{1b}', '\u{7}']));
+
+    let key = key_file(b"test-secret-key-at-least-32-bytes-long!");
+    let mismatched = token(json!({ "alg": unsafe_text }), json!({}), &[]);
+    let result = execute(
+        &[
+            "--verify",
+            "--algorithm",
+            "HS256",
+            "--key-file",
+            key.path().to_str().expect("UTF-8 path"),
+            &mismatched,
+        ],
+        "",
+    );
+    assert_eq!(result.code, 3);
+    assert!(result.stderr.contains(r"\u{1b}]0;Greendale\u{7}"));
+    assert!(!result.stderr.contains(['\u{1b}', '\u{7}']));
+}
+
 struct ErrorWriter(io::ErrorKind);
 
 impl Write for ErrorWriter {

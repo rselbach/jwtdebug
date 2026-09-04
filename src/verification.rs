@@ -22,6 +22,7 @@ use x509_cert::Certificate;
 use x509_cert::der::{Decode as _, Encode as _};
 
 use crate::constants::MAX_KEY_FILE_SIZE;
+use crate::output::escape_for_terminal;
 use crate::parser::{ParsedToken, decode_base64_url};
 use crate::time_claims::{TimeClaim, UnixTime, classify};
 
@@ -228,7 +229,7 @@ impl Verifier {
         if actual != self.algorithm.name() {
             return Err(VerificationError::AlgorithmMismatch {
                 expected: self.algorithm.name(),
-                actual: actual.to_owned(),
+                actual: escape_for_terminal(actual),
             });
         }
         validate_protected_header(&token.header)?;

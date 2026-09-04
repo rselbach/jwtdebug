@@ -1,6 +1,10 @@
 use std::fmt;
 use std::io::{self, Write};
 
+pub(crate) fn escape_for_terminal(value: &str) -> String {
+    value.chars().flat_map(char::escape_default).collect()
+}
+
 /// Fallible application output. Each stream retains its first error without
 /// preventing the other stream from delivering diagnostics or results.
 pub struct Output<'a> {

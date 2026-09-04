@@ -7,6 +7,8 @@ use regex::Regex;
 use serde_json::{Map, Value};
 use thiserror::Error;
 
+use crate::output::escape_for_terminal;
+
 static JWT_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*")
         .expect("the JWT extraction regex is valid")
@@ -146,9 +148,10 @@ fn is_extraction_boundary(character: char) -> bool {
 
 fn token_snippet(token: &str) -> String {
     if token.len() <= 20 {
-        token.to_owned()
+        escape_for_terminal(token)
     } else {
-        format!("{}...", token.chars().take(17).collect::<String>())
+        let snippet = token.chars().take(17).collect::<String>();
+        format!("{}...", escape_for_terminal(&snippet))
     }
 }
 
