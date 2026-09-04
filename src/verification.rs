@@ -12,7 +12,7 @@ use p521::ecdsa::VerifyingKey as P521Key;
 use p521::ecdsa::signature::Verifier as _;
 use p521::pkcs8::DecodePublicKey as _;
 use rsa::RsaPublicKey;
-use rsa::pkcs1::DecodeRsaPublicKey as _;
+use rsa::pkcs1::{DecodeRsaPrivateKey as _, DecodeRsaPublicKey as _};
 use rsa::traits::PublicKeyParts as _;
 use serde_json::{Map, Value};
 use sha2::{Sha256, Sha384, Sha512};
@@ -530,6 +530,7 @@ fn is_asymmetric_key(data: &[u8]) -> bool {
     spki::SubjectPublicKeyInfoRef::try_from(data).is_ok()
         || pkcs8::PrivateKeyInfo::try_from(data).is_ok()
         || sec1::EcPrivateKey::try_from(data).is_ok()
+        || rsa::RsaPrivateKey::from_pkcs1_der(data).is_ok()
         || RsaPublicKey::from_pkcs1_der(data).is_ok()
         || Certificate::from_der(data).is_ok()
 }
@@ -590,6 +591,7 @@ mod tests {
     use p521::pkcs8::EncodePublicKey as _;
     use rand::rngs::OsRng;
     use rsa::RsaPrivateKey;
+    use rsa::pkcs1::EncodeRsaPrivateKey as _;
     use serde_json::json;
     use signature::{RandomizedSigner as _, SignatureEncoding as _, Signer as _};
 
@@ -678,6 +680,17 @@ mod tests {
                 .expect_err("unsupported header");
             assert_eq!(error.to_string(), expected.to_string());
         }
+    }
+
+    #[test]
+    fn rejects_pkcs1_rsa_private_keys_as_hmac_secrets() {
+        let key = RsaPrivateKey::new(&mut OsRng, 1024).expect("generate RSA key");
+        let der = key.to_pkcs1_der().expect("encode RSA private key");
+
+        assert!(matches!(
+            prepare_key(Algorithm::HS256, der.as_bytes()),
+            Err(VerificationError::HmacKeyIsAsymmetric)
+        ));
     }
 
     #[test]
