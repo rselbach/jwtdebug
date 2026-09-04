@@ -38,5 +38,5 @@ make build
 ./build/jwtdebug --version
 ```
 
-Run `make help` for the full set of build, test, formatting, lint, install, and
-release targets.
+Other available targets are `make format-check`, `make lint`, `make install`,
+and `make clean`.
