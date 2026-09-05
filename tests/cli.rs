@@ -229,6 +229,35 @@ fn hmac_verification_succeeds_warns_once_and_fails_closed() {
 }
 
 #[test]
+fn hmac_key_newlines_are_preserved_and_explained_on_failure() {
+    let secret = b"Greendale Community College secret\n";
+    let key = key_file(secret);
+    for (signing_secret, want_code) in [(secret.as_slice(), 0), (secret.trim_ascii_end(), 3)] {
+        let signed = hmac_token(signing_secret, json!({ "sub": "Troy Barnes" }));
+        let result = execute(
+            &[
+                "--raw-claims",
+                "--verify",
+                "--algorithm",
+                "HS256",
+                "--key-file",
+                key.path().to_str().expect("UTF-8 path"),
+                &signed,
+            ],
+            "",
+        );
+        assert_eq!(result.code, want_code, "{result:?}");
+        if want_code == 0 {
+            assert!(result.stdout.contains("Troy Barnes"));
+            assert!(result.stderr.is_empty());
+        } else {
+            assert!(result.stdout.is_empty());
+            assert!(result.stderr.contains("key file ends with a newline"));
+        }
+    }
+}
+
+#[test]
 fn verification_configuration_errors_exit_three() {
     let token = unsigned_token("Missing Configuration");
     let key = key_file(b"test-secret-key-at-least-32-bytes-long!");

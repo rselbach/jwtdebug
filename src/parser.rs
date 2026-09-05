@@ -1,8 +1,7 @@
 use std::sync::LazyLock;
 
 use base64::Engine as _;
-use base64::alphabet::URL_SAFE;
-use base64::engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig};
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use regex::Regex;
 use serde_json::{Map, Value};
 use thiserror::Error;
@@ -13,14 +12,6 @@ static JWT_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*")
         .expect("the JWT extraction regex is valid")
 });
-
-const BASE64_URL: GeneralPurpose = GeneralPurpose::new(
-    &URL_SAFE,
-    GeneralPurposeConfig::new()
-        .with_encode_padding(false)
-        .with_decode_padding_mode(DecodePaddingMode::RequireNone)
-        .with_decode_allow_trailing_bits(false),
-);
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParsedToken {
@@ -98,7 +89,7 @@ pub fn decode_base64_url(segment: &str) -> Result<Vec<u8>, String> {
     {
         return Err(format!("invalid base64url character at byte {index}"));
     }
-    BASE64_URL
+    URL_SAFE_NO_PAD
         .decode(segment)
         .map_err(|error| error.to_string())
 }
@@ -160,7 +151,7 @@ mod tests {
     use super::*;
 
     fn segment(value: &str) -> String {
-        BASE64_URL.encode(value)
+        URL_SAFE_NO_PAD.encode(value)
     }
 
     fn token() -> String {
@@ -207,7 +198,10 @@ mod tests {
             "token header is not a JSON object"
         );
 
-        let invalid_utf8 = format!("{}.e30.", BASE64_URL.encode([b'{', b'"', 0xff, b'"', b'}']));
+        let invalid_utf8 = format!(
+            "{}.e30.",
+            URL_SAFE_NO_PAD.encode([b'{', b'"', 0xff, b'"', b'}'])
+        );
         assert!(
             parse_token(&invalid_utf8)
                 .expect_err("invalid UTF-8")

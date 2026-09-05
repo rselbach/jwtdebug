@@ -186,8 +186,6 @@ pub struct Verifier {
     algorithm: Algorithm,
     key: VerificationKey,
     ignore_expiration: bool,
-    hmac_key_has_trailing_newline: bool,
-    weak_hmac_key_warning: Option<WeakHmacKeyWarning>,
 }
 
 impl Verifier {
@@ -205,19 +203,24 @@ impl Verifier {
                 .ok_or(VerificationError::MissingAlgorithm)?,
         )?;
         let key_data = read_key_file(Path::new(key_file))?;
-        let (key, weak_hmac_key_warning) = prepare_key(algorithm, &key_data)?;
+        let key = prepare_key(algorithm, &key_data)?;
 
         Ok(Self {
             algorithm,
             key,
             ignore_expiration,
-            hmac_key_has_trailing_newline: key_data.ends_with(b"\n"),
-            weak_hmac_key_warning,
         })
     }
 
     pub fn weak_hmac_key_warning(&self) -> Option<WeakHmacKeyWarning> {
-        self.weak_hmac_key_warning
+        let VerificationKey::Hmac(key) = &self.key else {
+            return None;
+        };
+        let minimum = self.algorithm.minimum_hmac_key_size()?;
+        (key.len() < minimum).then_some(WeakHmacKeyWarning {
+            actual: key.len(),
+            minimum,
+        })
     }
 
     pub fn verify(&self, token: &ParsedToken, now: UnixTime) -> Result<(), VerificationError> {
@@ -241,8 +244,8 @@ impl Verifier {
         let signature =
             decode_base64_url(&token.signature).map_err(VerificationError::DecodeSignature)?;
         if let Err(error) = self.verify_signature(signing_input.as_bytes(), &signature) {
-            if matches!(self.key, VerificationKey::Hmac(_))
-                && self.hmac_key_has_trailing_newline
+            if let VerificationKey::Hmac(key) = &self.key
+                && key.ends_with(b"\n")
                 && matches!(error, VerificationError::InvalidSignature)
             {
                 return Err(VerificationError::InvalidSignatureTrailingNewline);
@@ -368,19 +371,12 @@ where
         .map_err(|_| VerificationError::InvalidSignature)
 }
 
-fn prepare_key(
-    algorithm: Algorithm,
-    data: &[u8],
-) -> Result<(VerificationKey, Option<WeakHmacKeyWarning>), VerificationError> {
-    if let Some(minimum) = algorithm.minimum_hmac_key_size() {
+fn prepare_key(algorithm: Algorithm, data: &[u8]) -> Result<VerificationKey, VerificationError> {
+    if algorithm.minimum_hmac_key_size().is_some() {
         if is_asymmetric_key(data) {
             return Err(VerificationError::HmacKeyIsAsymmetric);
         }
-        let warning = (data.len() < minimum).then_some(WeakHmacKeyWarning {
-            actual: data.len(),
-            minimum,
-        });
-        return Ok((VerificationKey::Hmac(data.to_vec()), warning));
+        return Ok(VerificationKey::Hmac(data.to_vec()));
     }
 
     let der = decode_public_key_material(data).map_err(|message| VerificationError::PublicKey {
@@ -443,7 +439,7 @@ fn prepare_key(
         ),
         Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => unreachable!(),
     };
-    Ok((key, None))
+    Ok(key)
 }
 
 fn read_key_file(path: &Path) -> Result<Vec<u8>, VerificationError> {
@@ -474,7 +470,7 @@ fn read_key_file(path: &Path) -> Result<Vec<u8>, VerificationError> {
 }
 
 fn decode_public_key_material(data: &[u8]) -> Result<Vec<u8>, &'static str> {
-    let trimmed = trim_ascii_whitespace(data);
+    let trimmed = data.trim_ascii();
     if !trimmed.starts_with(b"-----BEGIN ") {
         return Err("invalid PEM data");
     }
@@ -533,16 +529,6 @@ fn is_asymmetric_key(data: &[u8]) -> bool {
         || rsa::RsaPrivateKey::from_pkcs1_der(data).is_ok()
         || RsaPublicKey::from_pkcs1_der(data).is_ok()
         || Certificate::from_der(data).is_ok()
-}
-
-fn trim_ascii_whitespace(mut data: &[u8]) -> &[u8] {
-    while data.first().is_some_and(u8::is_ascii_whitespace) {
-        data = &data[1..];
-    }
-    while data.last().is_some_and(u8::is_ascii_whitespace) {
-        data = &data[..data.len() - 1];
-    }
-    data
 }
 
 fn validate_time_claims(
@@ -616,8 +602,6 @@ mod tests {
             algorithm,
             key,
             ignore_expiration: false,
-            hmac_key_has_trailing_newline: false,
-            weak_hmac_key_warning: None,
         }
     }
 
@@ -640,14 +624,8 @@ mod tests {
             json!({ "alg": "HS256" }),
             json!({ "sub": "Annie Edison", "exp": 1_700_000_100 }),
         );
-        let (key, warning) = prepare_key(Algorithm::HS256, secret).expect("prepare key");
-        let verifier = Verifier {
-            algorithm: Algorithm::HS256,
-            key,
-            ignore_expiration: false,
-            hmac_key_has_trailing_newline: false,
-            weak_hmac_key_warning: warning,
-        };
+        let key = prepare_key(Algorithm::HS256, secret).expect("prepare key");
+        let verifier = verifier(Algorithm::HS256, key);
 
         assert!(
             verifier
@@ -861,7 +839,7 @@ mod tests {
             .expect("encode RSA key");
         assert!(matches!(
             prepare_key(Algorithm::RS256, &pem(rsa.as_bytes())),
-            Ok((VerificationKey::Rsa(_), None))
+            Ok(VerificationKey::Rsa(_))
         ));
 
         let p256 = p256::ecdsa::SigningKey::random(&mut rng);
@@ -871,7 +849,7 @@ mod tests {
             .expect("encode P-256 key");
         assert!(matches!(
             prepare_key(Algorithm::ES256, &pem(p256.as_bytes())),
-            Ok((VerificationKey::P256(_), None))
+            Ok(VerificationKey::P256(_))
         ));
 
         let p384 = p384::ecdsa::SigningKey::random(&mut rng);
@@ -881,7 +859,7 @@ mod tests {
             .expect("encode P-384 key");
         assert!(matches!(
             prepare_key(Algorithm::ES384, &pem(p384.as_bytes())),
-            Ok((VerificationKey::P384(_), None))
+            Ok(VerificationKey::P384(_))
         ));
 
         let p521 = p521::ecdsa::SigningKey::generate();
@@ -891,7 +869,7 @@ mod tests {
             .expect("encode P-521 key");
         assert!(matches!(
             prepare_key(Algorithm::ES512, &pem(p521.as_bytes())),
-            Ok((VerificationKey::P521(_), None))
+            Ok(VerificationKey::P521(_))
         ));
 
         let ed25519 = ed25519_dalek::SigningKey::from_bytes(&[7; 32]);
@@ -901,7 +879,7 @@ mod tests {
             .expect("encode Ed25519 key");
         assert!(matches!(
             prepare_key(Algorithm::EdDsa, &pem(ed25519.as_bytes())),
-            Ok((VerificationKey::Ed25519(_), None))
+            Ok(VerificationKey::Ed25519(_))
         ));
     }
 }
